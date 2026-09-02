@@ -1,0 +1,12 @@
+target
+.git
+.github
+.env
+.env.*
+frontend/node_modules
+frontend/dist
+frontend/.output
+frontend/.vinxi
+frontend/.vite
+frontend/.env
+frontend/.env.*

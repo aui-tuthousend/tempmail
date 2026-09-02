@@ -1,0 +1,39 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Rust
+/target/
+**/*.rs.bk
+
+# Frontend
+/frontend/node_modules/
+/frontend/.output/
+/frontend/dist/
+/frontend/.vinxi/
+/frontend/.tanstack/
+/frontend/.vite/
+/frontend/.env
+/frontend/.env.*
+!/frontend/.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+
+# Local data
+*.sqlite
+*.sqlite3
+*.db

@@ -1,0 +1,16 @@
+[package]
+name = "smtp-receiver"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+redis.workspace = true
+shared = { path = "../shared" }
+tokio = { workspace = true, features = ["macros", "net", "io-util", "signal", "rt-multi-thread"] }
+tokio-rustls = "0.26"
+rustls-pemfile = "2"
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }

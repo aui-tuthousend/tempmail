@@ -1,0 +1,22 @@
+[package]
+name = "api-server"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-stream = "0.3"
+axum = { version = "0.7", features = ["macros"] }
+chrono.workspace = true
+futures-util = "0.3"
+redis.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+shared = { path = "../shared" }
+tokio = { workspace = true, features = ["macros", "net", "signal", "rt-multi-thread", "time"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+uuid.workspace = true
