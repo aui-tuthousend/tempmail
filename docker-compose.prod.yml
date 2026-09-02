@@ -10,11 +10,7 @@ services:
       - tempmail
 
   api-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        PACKAGE: api-server
+    image: ghcr.io/aui-tuthousend/tempmail-api-server:latest
     restart: unless-stopped
     depends_on:
       - dragonfly
@@ -26,17 +22,13 @@ services:
       MAILBOX_LOCAL_PART_LENGTH: 12
       API_BIND_ADDR: 0.0.0.0:8080
       CORS_ALLOWED_ORIGINS: https://tempmail.intotheheap.net
-    expose:
-      - "8080"
+    ports:
+      - "127.0.0.1:8080:8080"
     networks:
       - tempmail
 
   smtp-receiver:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        PACKAGE: smtp-receiver
+    image: ghcr.io/aui-tuthousend/tempmail-smtp-receiver:latest
     restart: unless-stopped
     depends_on:
       - dragonfly
@@ -62,11 +54,7 @@ services:
       - tempmail
 
   email-processor:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        PACKAGE: email-processor
+    image: ghcr.io/aui-tuthousend/tempmail-email-processor:latest
     restart: unless-stopped
     depends_on:
       - dragonfly
@@ -91,11 +79,7 @@ services:
       - tempmail
 
   cleanup-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        PACKAGE: cleanup-worker
+    image: ghcr.io/aui-tuthousend/tempmail-cleanup-worker:latest
     restart: unless-stopped
     depends_on:
       - dragonfly
@@ -114,11 +98,7 @@ services:
       - tempmail
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_URL: /api
+    image: ghcr.io/aui-tuthousend/tempmail-frontend:latest
     restart: unless-stopped
     depends_on:
       - api-server
@@ -126,8 +106,8 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3000
-    expose:
-      - "3000"
+    ports:
+      - "127.0.0.1:3000:3000"
     networks:
       - tempmail
 

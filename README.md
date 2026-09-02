@@ -97,13 +97,23 @@ File [docker-compose.prod.yml](docker-compose.prod.yml) berisi satu stack untuk:
 - `cleanup-worker`
 - `frontend`
 
+App image dipublish ke GitHub Container Registry (GHCR):
+
+- `ghcr.io/aui-tuthousend/tempmail-api-server:latest`
+- `ghcr.io/aui-tuthousend/tempmail-smtp-receiver:latest`
+- `ghcr.io/aui-tuthousend/tempmail-email-processor:latest`
+- `ghcr.io/aui-tuthousend/tempmail-cleanup-worker:latest`
+- `ghcr.io/aui-tuthousend/tempmail-frontend:latest`
+
+Workflow [publish-images.yml](.github/workflows/publish-images.yml) otomatis build dan push image ke GHCR saat push ke `main`/`master`, atau bisa dijalankan manual dari tab Actions.
+
 Di Portainer, buat Stack baru lalu gunakan isi `docker-compose.prod.yml`. Semua service memakai network internal yang sama, sehingga app services mengakses Dragonfly dengan:
 
 ```env
 REDIS_URL=redis://dragonfly:6379
 ```
 
-Frontend production memakai `VITE_API_BASE_URL=/api`, jadi nginx perlu proxy path `/api` ke `api-server:8080` dan proxy domain frontend ke `frontend:3000`.
+Frontend production memakai `VITE_API_BASE_URL=/api`, jadi nginx perlu proxy path `/api` ke host `127.0.0.1:8080` dan proxy domain frontend ke host `127.0.0.1:3000`.
 
 ## DNS untuk domain email
 
