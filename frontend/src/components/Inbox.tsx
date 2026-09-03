@@ -1,4 +1,7 @@
+import { useState } from 'react'
+
 import type { EmailMessage } from '../lib/api/types'
+import { EmailDetailDialog } from './EmailDetailDialog'
 
 type InboxProps = {
   messages: EmailMessage[]
@@ -6,6 +9,8 @@ type InboxProps = {
 }
 
 export function Inbox({ messages, isLoading }: InboxProps) {
+  const [selectedMessage, setSelectedMessage] = useState<EmailMessage | null>(null)
+
   if (isLoading) {
     return <section className="card empty-state">Memuat inbox...</section>
   }
@@ -20,29 +25,35 @@ export function Inbox({ messages, isLoading }: InboxProps) {
   }
 
   return (
-    <section className="card inbox">
-      <div className="section-header">
-        <p className="eyebrow">Inbox</p>
-        <span>{messages.length} email</span>
-      </div>
-      <ul>
-        {messages.map((message) => (
-          <MessageItem key={message.id} message={message} />
-        ))}
-      </ul>
-    </section>
+    <>
+      <section className="card inbox">
+        <div className="section-header">
+          <p className="eyebrow">Inbox</p>
+          <span>{messages.length} email</span>
+        </div>
+        <ul>
+          {messages.map((message) => (
+            <MessageItem key={message.id} message={message} onOpen={() => setSelectedMessage(message)} />
+          ))}
+        </ul>
+      </section>
+
+      <EmailDetailDialog message={selectedMessage} onClose={() => setSelectedMessage(null)} />
+    </>
   )
 }
 
-function MessageItem({ message }: { message: EmailMessage }) {
+function MessageItem({ message, onOpen }: { message: EmailMessage; onOpen: () => void }) {
   return (
     <li className="message-item">
-      <div>
-        <h3>{message.subject || '(Tanpa subject)'}</h3>
-        <p>{message.from || 'Unknown sender'}</p>
-        <small>{formatDate(message.received_at)}</small>
-      </div>
-      {message.attachments.length > 0 && <span>{message.attachments.length} attachment</span>}
+      <button type="button" className="message-button" onClick={onOpen}>
+        <div>
+          <h3>{message.subject || '(Tanpa subject)'}</h3>
+          <p>{message.from || 'Unknown sender'}</p>
+          <small>{formatDate(message.received_at)}</small>
+        </div>
+        {message.attachments.length > 0 && <span>{message.attachments.length} attachment</span>}
+      </button>
     </li>
   )
 }

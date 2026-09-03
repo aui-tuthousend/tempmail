@@ -111,7 +111,26 @@ button:disabled {
 .message-item {
   border: 1px solid rgba(23, 32, 51, 0.08);
   border-radius: 18px;
+  padding: 0;
+}
+
+.message-button {
+  align-items: center;
+  background: transparent;
+  border-radius: 18px;
+  color: inherit;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
   padding: 1rem;
+  text-align: left;
+  width: 100%;
+}
+
+.message-button:hover,
+.message-button:focus-visible {
+  background: #f8faff;
+  outline: none;
 }
 
 .message-item p {
@@ -125,6 +144,7 @@ button:disabled {
   font-size: 0.8rem;
   font-weight: 700;
   padding: 0.35rem 0.65rem;
+  white-space: nowrap;
 }
 
 .empty-state,
@@ -137,11 +157,129 @@ button:disabled {
   color: #c2410c;
 }
 
+.dialog-backdrop {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.56);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1rem;
+  position: fixed;
+  z-index: 20;
+}
+
+.dialog-panel {
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.26);
+  max-height: min(760px, 92vh);
+  max-width: 760px;
+  overflow: auto;
+  padding: 1.25rem;
+  width: 100%;
+}
+
+.dialog-header {
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(23, 32, 51, 0.08);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding-bottom: 1rem;
+}
+
+.dialog-header h2,
+.email-body h3,
+.attachments h3 {
+  margin: 0;
+}
+
+.ghost-button {
+  background: #eef2ff;
+  color: #315efb;
+  flex-shrink: 0;
+}
+
+.email-meta {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 1rem 0;
+}
+
+.email-meta div {
+  background: #f8faff;
+  border-radius: 16px;
+  padding: 0.85rem;
+}
+
+.email-meta dt {
+  color: #68758c;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+}
+
+.email-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.email-body {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.email-body pre {
+  background: #0f172a;
+  border-radius: 18px;
+  color: #e2e8f0;
+  font: 0.95rem/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  margin: 0;
+  max-height: 360px;
+  overflow: auto;
+  padding: 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.attachments {
+  margin-top: 1rem;
+}
+
+.attachments ul {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.attachments li {
+  align-items: center;
+  background: #f8faff;
+  border-radius: 14px;
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem;
+}
+
+.attachments small {
+  color: #68758c;
+}
+
 @media (max-width: 720px) {
   .mailbox-card,
   .start-card,
-  .message-item {
+  .message-button,
+  .dialog-header,
+  .attachments li {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .email-meta {
+    grid-template-columns: 1fr;
   }
 }
