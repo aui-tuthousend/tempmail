@@ -11,8 +11,8 @@ aws-config = { version = "1", default-features = false, features = ["behavior-ve
 aws-credential-types = "1"
 aws-sdk-s3 = "1"
 chrono.workspace = true
-redis.workspace = true
 shared = { path = "../shared" }
+sqlx.workspace = true
 tokio = { workspace = true, features = ["macros", "signal", "rt-multi-thread", "time"] }
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }

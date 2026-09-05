@@ -2,6 +2,7 @@ use anyhow::Result;
 use cleanup_worker::config::CleanupConfig;
 use cleanup_worker::object_storage::ObjectStorage;
 use cleanup_worker::worker::CleanupWorker;
+use sqlx::postgres::PgPoolOptions;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -10,10 +11,13 @@ async fn main() -> Result<()> {
         .init();
 
     let config = CleanupConfig::from_env()?;
-    let redis = shared::redis_helper::connection_manager(&config.redis.url).await?;
+    let db = PgPoolOptions::new()
+        .max_connections(2)
+        .connect(&config.postgres.database_url)
+        .await?;
     let object_storage = ObjectStorage::from_config(&config.r2).await;
 
-    CleanupWorker::new(config, redis, object_storage)
+    CleanupWorker::new(config, db, object_storage)
         .run_until_shutdown()
         .await
 }

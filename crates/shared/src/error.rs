@@ -43,6 +43,9 @@ pub enum TempMailError {
     #[error("invalid api key")]
     InvalidApiKey,
 
+    #[error("rate limit exceeded")]
+    RateLimitExceeded,
+
     #[error("conflict: {0}")]
     Conflict(String),
 

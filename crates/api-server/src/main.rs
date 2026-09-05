@@ -65,6 +65,7 @@ async fn main() -> Result<()> {
         AppState::new(
             config,
             db,
+            redis.clone(),
             redis,
             mailbox_service,
             event_service,

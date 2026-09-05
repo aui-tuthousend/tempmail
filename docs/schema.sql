@@ -44,6 +44,7 @@ CREATE TABLE session_accounts (
 );
 
 CREATE INDEX idx_session_accounts_session ON session_accounts(session_id);
+CREATE INDEX idx_session_accounts_session_logged_in ON session_accounts(session_id, logged_in_at ASC);
 CREATE INDEX idx_session_accounts_account ON session_accounts(account_id);
 
 CREATE UNIQUE INDEX idx_one_active_account_per_session
@@ -99,6 +100,12 @@ CREATE TABLE messages (
 CREATE INDEX idx_messages_account_id ON messages(account_id);
 CREATE INDEX idx_messages_flags ON messages(account_id, is_archived, is_deleted, is_starred);
 CREATE INDEX idx_messages_received_at ON messages(account_id, received_at DESC);
+CREATE INDEX idx_messages_inbox_account_received
+ON messages(account_id, received_at DESC)
+WHERE is_deleted = false AND is_archived = false;
+CREATE INDEX idx_messages_deleted_retention
+ON messages(updated_at)
+WHERE is_deleted = true;
 
 CREATE TABLE attachments (
     id              UUID PRIMARY KEY,

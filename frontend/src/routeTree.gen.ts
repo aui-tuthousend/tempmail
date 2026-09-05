@@ -10,33 +10,119 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as RegisterRouteImport } from './routes/register'
+import { Route as AppMailRouteImport } from './routes/_app.mail'
+import { Route as AppMailArchivedRouteImport } from './routes/_app.mail.archived'
+import { Route as AppMailDeletedRouteImport } from './routes/_app.mail.deleted'
+import { Route as AppMailStarredRouteImport } from './routes/_app.mail.starred'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppMailRoute = AppMailRouteImport.update({
+  id: '/mail',
+  path: '/mail',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMailArchivedRoute = AppMailArchivedRouteImport.update({
+  id: '/archived',
+  path: '/archived',
+  getParentRoute: () => AppMailRoute,
+} as any)
+const AppMailDeletedRoute = AppMailDeletedRouteImport.update({
+  id: '/deleted',
+  path: '/deleted',
+  getParentRoute: () => AppMailRoute,
+} as any)
+const AppMailStarredRoute = AppMailStarredRouteImport.update({
+  id: '/starred',
+  path: '/starred',
+  getParentRoute: () => AppMailRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
+  '/mail': typeof AppMailRouteWithChildren
+  '/mail/archived': typeof AppMailArchivedRoute
+  '/mail/deleted': typeof AppMailDeletedRoute
+  '/mail/starred': typeof AppMailStarredRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
+  '/mail': typeof AppMailRouteWithChildren
+  '/mail/archived': typeof AppMailArchivedRoute
+  '/mail/deleted': typeof AppMailDeletedRoute
+  '/mail/starred': typeof AppMailStarredRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
+  '/_app/mail': typeof AppMailRouteWithChildren
+  '/_app/mail/archived': typeof AppMailArchivedRoute
+  '/_app/mail/deleted': typeof AppMailDeletedRoute
+  '/_app/mail/starred': typeof AppMailStarredRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/register'
+    | '/mail'
+    | '/mail/archived'
+    | '/mail/deleted'
+    | '/mail/starred'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/login'
+    | '/register'
+    | '/mail'
+    | '/mail/archived'
+    | '/mail/deleted'
+    | '/mail/starred'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/login'
+    | '/register'
+    | '/_app/mail'
+    | '/_app/mail/archived'
+    | '/_app/mail/deleted'
+    | '/_app/mail/starred'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  RegisterRoute: typeof RegisterRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +134,88 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/mail': {
+      id: '/_app/mail'
+      path: '/mail'
+      fullPath: '/mail'
+      preLoaderRoute: typeof AppMailRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/mail/archived': {
+      id: '/_app/mail/archived'
+      path: '/archived'
+      fullPath: '/mail/archived'
+      preLoaderRoute: typeof AppMailArchivedRouteImport
+      parentRoute: typeof AppMailRoute
+    }
+    '/_app/mail/deleted': {
+      id: '/_app/mail/deleted'
+      path: '/deleted'
+      fullPath: '/mail/deleted'
+      preLoaderRoute: typeof AppMailDeletedRouteImport
+      parentRoute: typeof AppMailRoute
+    }
+    '/_app/mail/starred': {
+      id: '/_app/mail/starred'
+      path: '/starred'
+      fullPath: '/mail/starred'
+      preLoaderRoute: typeof AppMailStarredRouteImport
+      parentRoute: typeof AppMailRoute
+    }
   }
 }
 
+interface AppMailRouteChildren {
+  AppMailArchivedRoute: typeof AppMailArchivedRoute
+  AppMailDeletedRoute: typeof AppMailDeletedRoute
+  AppMailStarredRoute: typeof AppMailStarredRoute
+}
+
+const AppMailRouteChildren: AppMailRouteChildren = {
+  AppMailArchivedRoute: AppMailArchivedRoute,
+  AppMailDeletedRoute: AppMailDeletedRoute,
+  AppMailStarredRoute: AppMailStarredRoute,
+}
+
+const AppMailRouteWithChildren =
+  AppMailRoute._addFileChildren(AppMailRouteChildren)
+
+interface AppRouteChildren {
+  AppMailRoute: typeof AppMailRouteWithChildren
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppMailRoute: AppMailRouteWithChildren,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  LoginRoute: LoginRoute,
+  RegisterRoute: RegisterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

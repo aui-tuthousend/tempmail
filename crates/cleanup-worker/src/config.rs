@@ -1,13 +1,14 @@
 use std::time::Duration;
 
-use shared::config::{env_parse_or, load_dotenv, RedisConfig};
+use shared::config::{env_parse_or, load_dotenv, PostgresConfig};
 use shared::Result;
 
 #[derive(Debug, Clone)]
 pub struct CleanupConfig {
-    pub redis: RedisConfig,
+    pub postgres: PostgresConfig,
     pub interval: Duration,
-    pub batch_size: usize,
+    pub batch_size: i64,
+    pub soft_delete_retention_days: i64,
     pub r2: R2Config,
 }
 
@@ -25,9 +26,10 @@ impl CleanupConfig {
         load_dotenv();
 
         Ok(Self {
-            redis: RedisConfig::from_env()?,
+            postgres: PostgresConfig::from_env()?,
             interval: Duration::from_secs(env_parse_or("CLEANUP_INTERVAL_SECONDS", 60)?),
             batch_size: env_parse_or("CLEANUP_BATCH_SIZE", 100)?,
+            soft_delete_retention_days: env_parse_or("SOFT_DELETE_RETENTION_DAYS", 30)?,
             r2: R2Config::from_env(),
         })
     }

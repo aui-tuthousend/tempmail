@@ -9,6 +9,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use futures_util::Stream;
 use futures_util::StreamExt;
+use redis::AsyncCommands;
 use shared::events::{DomainEvent, EMAIL_RECEIVED_CHANNEL};
 use shared::TempMailError;
 use tracing::{error, warn};
@@ -31,6 +32,15 @@ pub async fn create_account(
     headers: HeaderMap,
     Json(request): Json<CreateAccountRequest>,
 ) -> Result<(StatusCode, Json<AccountResponse>), (StatusCode, Json<ErrorResponse>)> {
+    rate_limit(
+        &state,
+        "register",
+        client_identifier(&headers),
+        state.config.register_rate_limit_max_requests,
+    )
+    .await
+    .map_err(error_response)?;
+
     let api_key = headers
         .get(API_KEY_HEADER)
         .and_then(|value| value.to_str().ok());
@@ -48,6 +58,15 @@ pub async fn login(
     headers: HeaderMap,
     Json(request): Json<LoginRequest>,
 ) -> Result<(StatusCode, HeaderMap, Json<LoginResponse>), (StatusCode, Json<ErrorResponse>)> {
+    rate_limit(
+        &state,
+        "login",
+        client_identifier(&headers),
+        state.config.login_rate_limit_max_requests,
+    )
+    .await
+    .map_err(error_response)?;
+
     let cookie_name = &state.config.session_cookie_name;
     let existing_token = session_token_from_headers(&headers, cookie_name);
     let login = state
@@ -321,6 +340,49 @@ fn session_token_from_headers(headers: &HeaderMap, cookie_name: &str) -> Option<
     })
 }
 
+async fn rate_limit(
+    state: &AppState,
+    action: &str,
+    identifier: String,
+    max_requests: usize,
+) -> shared::Result<()> {
+    if max_requests == 0 {
+        return Ok(());
+    }
+
+    let key = format!("api:rate-limit:{action}:{identifier}");
+    let mut redis = state.rate_limit_redis.lock().await;
+    let count: usize = redis.incr(&key, 1).await?;
+
+    if count == 1 {
+        let _: bool = redis
+            .expire(&key, state.config.auth_rate_limit_window_seconds as i64)
+            .await?;
+    }
+
+    if count > max_requests {
+        return Err(TempMailError::RateLimitExceeded);
+    }
+
+    Ok(())
+}
+
+fn client_identifier(headers: &HeaderMap) -> String {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(',').next())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            headers
+                .get("x-real-ip")
+                .and_then(|value| value.to_str().ok())
+        })
+        .unwrap_or("unknown")
+        .to_owned()
+}
+
 fn session_cookie_header(
     cookie_name: &str,
     token: &str,
@@ -341,6 +403,7 @@ fn error_response(error: TempMailError) -> (StatusCode, Json<ErrorResponse>) {
     let status = match error {
         TempMailError::ApiKeyRequired => StatusCode::UNAUTHORIZED,
         TempMailError::InvalidApiKey => StatusCode::FORBIDDEN,
+        TempMailError::RateLimitExceeded => StatusCode::TOO_MANY_REQUESTS,
         TempMailError::AuthenticationFailed => StatusCode::UNAUTHORIZED,
         TempMailError::InvalidSession | TempMailError::SessionExpired => StatusCode::UNAUTHORIZED,
         TempMailError::AuthorizationFailed => StatusCode::FORBIDDEN,

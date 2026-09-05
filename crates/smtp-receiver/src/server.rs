@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
 use redis::aio::ConnectionManager;
+use redis::AsyncCommands;
 use shared::models::{Envelope, RawEmail};
 use shared::queue::QueueMessage;
 use shared::redis_helper::push_queue_message;
@@ -235,6 +236,12 @@ impl SmtpSession {
             return Ok(());
         }
 
+        if !self.smtp_rate_limit_allowed().await? {
+            self.write_response(421, "rate limit exceeded").await?;
+            self.reset_envelope();
+            return Ok(());
+        }
+
         self.write_response(354, "end data with <CR><LF>.<CR><LF>")
             .await?;
 
@@ -266,6 +273,33 @@ impl SmtpSession {
         self.reset_envelope();
         info!(%stream_id, remote_addr = %self.remote_addr, "raw email pushed to Redis Stream");
         self.write_response(250, "queued").await
+    }
+
+    async fn smtp_rate_limit_allowed(&self) -> Result<bool> {
+        let mut redis = self.state.redis.clone();
+        let ip_allowed = rate_limit_key(
+            &mut redis,
+            &format!("smtp:rate-limit:ip:{}", self.remote_addr.ip()),
+            self.state.config.rate_limit_messages_per_ip,
+            self.state.config.rate_limit_window_seconds,
+        )
+        .await?;
+
+        if !ip_allowed {
+            return Ok(false);
+        }
+
+        let Some(sender_domain) = self.mail_from.as_deref().and_then(email_domain) else {
+            return Ok(true);
+        };
+
+        rate_limit_key(
+            &mut redis,
+            &format!("smtp:rate-limit:sender-domain:{sender_domain}"),
+            self.state.config.rate_limit_messages_per_sender_domain,
+            self.state.config.rate_limit_window_seconds,
+        )
+        .await
     }
 
     async fn handle_rset(&mut self) -> Result<()> {
@@ -409,6 +443,28 @@ fn extract_path(args: &str, prefix: &str) -> Option<String> {
 
     let address = address.trim().to_ascii_lowercase();
     (!address.is_empty() && address.contains('@')).then_some(address)
+}
+
+async fn rate_limit_key(
+    redis: &mut ConnectionManager,
+    key: &str,
+    max_requests: usize,
+    window_seconds: i64,
+) -> Result<bool> {
+    if max_requests == 0 {
+        return Ok(true);
+    }
+
+    let count: usize = redis.incr(key, 1).await?;
+    if count == 1 {
+        let _: bool = redis.expire(key, window_seconds).await?;
+    }
+
+    Ok(count <= max_requests)
+}
+
+fn email_domain(address: &str) -> Option<&str> {
+    address.rsplit_once('@').map(|(_, domain)| domain)
 }
 
 fn recipient_is_local(address: &str, mailbox_domain: &str) -> bool {

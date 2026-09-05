@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Context, Result};
-use chrono::Duration;
 use mail_parser::{Addr, Address, MessageParser, MimeHeaders};
 use redis::aio::ConnectionManager;
 use shared::events::{DomainEvent, EmailReceivedEvent, EMAIL_RECEIVED_CHANNEL};

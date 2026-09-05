@@ -91,7 +91,14 @@ export function AuthPanel({
         className="card auth-card"
         onSubmit={(event) => {
           event.preventDefault()
-          onLogin({ username_or_email: joinMailboxAddress(loginLocalPart), password: loginPassword })
+          onLogin({
+            username_or_email: joinMailboxAddress(loginLocalPart),
+            password: loginPassword,
+            device_info: {
+              user_agent: navigator.userAgent,
+              platform: navigator.platform,
+            },
+          })
         }}
       >
         <div>
