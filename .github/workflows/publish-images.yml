@@ -102,6 +102,7 @@ jobs:
           file: ./frontend/Dockerfile
           build-args: |
             VITE_API_BASE_URL=/api
+            VITE_MAILBOX_DOMAIN=${{ vars.VITE_MAILBOX_DOMAIN || 'intotheheap.net' }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

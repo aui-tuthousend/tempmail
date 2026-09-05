@@ -1,9 +1,12 @@
-use shared::config::{env_or, env_parse_or, load_dotenv, MailboxConfig, QueueConfig, RedisConfig};
+use shared::config::{
+    env_or, env_parse_or, load_dotenv, MailboxConfig, PostgresConfig, QueueConfig, RedisConfig,
+};
 use shared::Result;
 
 #[derive(Debug, Clone)]
 pub struct EmailProcessorConfig {
     pub redis: RedisConfig,
+    pub postgres: PostgresConfig,
     pub queue: QueueConfig,
     pub mailbox: MailboxConfig,
     pub consumer_name: String,
@@ -28,6 +31,7 @@ impl EmailProcessorConfig {
 
         Ok(Self {
             redis: RedisConfig::from_env()?,
+            postgres: PostgresConfig::from_env()?,
             queue: QueueConfig::from_env()?,
             mailbox: MailboxConfig::from_env()?,
             consumer_name: env_or("REDIS_CONSUMER_NAME", "email-processor-1"),

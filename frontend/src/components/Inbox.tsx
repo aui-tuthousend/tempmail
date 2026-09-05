@@ -1,15 +1,37 @@
 import { useState } from 'react'
 
-import type { EmailMessage } from '../lib/api/types'
+import type { Message } from '../lib/api/types'
 import { EmailDetailDialog } from './EmailDetailDialog'
 
 type InboxProps = {
-  messages: EmailMessage[]
+  messages: Message[]
   isLoading: boolean
+  isAuthenticated: boolean
+  onToggleRead: (message: Message) => void
+  onToggleStar: (message: Message) => void
+  onArchive: (message: Message) => void
+  onDelete: (message: Message) => void
 }
 
-export function Inbox({ messages, isLoading }: InboxProps) {
-  const [selectedMessage, setSelectedMessage] = useState<EmailMessage | null>(null)
+export function Inbox({
+  messages,
+  isLoading,
+  isAuthenticated,
+  onToggleRead,
+  onToggleStar,
+  onArchive,
+  onDelete,
+}: InboxProps) {
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null)
+
+  if (!isAuthenticated) {
+    return (
+      <section className="card empty-state">
+        <h2>Login diperlukan</h2>
+        <p>Login terlebih dahulu untuk melihat inbox persistent account.</p>
+      </section>
+    )
+  }
 
   if (isLoading) {
     return <section className="card empty-state">Memuat inbox...</section>
@@ -33,7 +55,15 @@ export function Inbox({ messages, isLoading }: InboxProps) {
         </div>
         <ul>
           {messages.map((message) => (
-            <MessageItem key={message.id} message={message} onOpen={() => setSelectedMessage(message)} />
+            <MessageItem
+              key={message.id}
+              message={message}
+              onOpen={() => setSelectedMessage(message)}
+              onArchive={() => onArchive(message)}
+              onDelete={() => onDelete(message)}
+              onToggleRead={() => onToggleRead(message)}
+              onToggleStar={() => onToggleStar(message)}
+            />
           ))}
         </ul>
       </section>
@@ -43,17 +73,45 @@ export function Inbox({ messages, isLoading }: InboxProps) {
   )
 }
 
-function MessageItem({ message, onOpen }: { message: EmailMessage; onOpen: () => void }) {
+function MessageItem({
+  message,
+  onOpen,
+  onToggleRead,
+  onToggleStar,
+  onArchive,
+  onDelete,
+}: {
+  message: Message
+  onOpen: () => void
+  onToggleRead: () => void
+  onToggleStar: () => void
+  onArchive: () => void
+  onDelete: () => void
+}) {
   return (
-    <li className="message-item">
+    <li className={message.is_read ? 'message-item read' : 'message-item unread'}>
       <button type="button" className="message-button" onClick={onOpen}>
         <div>
           <h3>{message.subject || '(Tanpa subject)'}</h3>
-          <p>{message.from || 'Unknown sender'}</p>
+          <p>{message.from_name || message.from_address || 'Unknown sender'}</p>
           <small>{formatDate(message.received_at)}</small>
         </div>
-        {message.attachments.length > 0 && <span>{message.attachments.length} attachment</span>}
+        {message.has_attachments && <span>attachment</span>}
       </button>
+      <div className="message-actions">
+        <button type="button" className="ghost-button" onClick={onToggleRead}>
+          {message.is_read ? 'Unread' : 'Read'}
+        </button>
+        <button type="button" className="ghost-button" onClick={onToggleStar}>
+          {message.is_starred ? 'Unstar' : 'Star'}
+        </button>
+        <button type="button" className="ghost-button" onClick={onArchive}>
+          Archive
+        </button>
+        <button type="button" className="ghost-button danger" onClick={onDelete}>
+          Delete
+        </button>
+      </div>
     </li>
   )
 }

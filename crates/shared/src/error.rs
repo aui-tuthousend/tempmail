@@ -19,6 +19,33 @@ pub enum TempMailError {
     #[error("invalid email address: {0}")]
     InvalidEmailAddress(String),
 
+    #[error("auth configuration error: {message}")]
+    AuthConfig { message: String },
+
+    #[error("password hash error: {message}")]
+    PasswordHash { message: String },
+
+    #[error("authentication failed")]
+    AuthenticationFailed,
+
+    #[error("authorization failed")]
+    AuthorizationFailed,
+
+    #[error("session expired")]
+    SessionExpired,
+
+    #[error("invalid session")]
+    InvalidSession,
+
+    #[error("api key is required")]
+    ApiKeyRequired,
+
+    #[error("invalid api key")]
+    InvalidApiKey,
+
+    #[error("conflict: {0}")]
+    Conflict(String),
+
     #[error("resource not found: {0}")]
     NotFound(String),
 }

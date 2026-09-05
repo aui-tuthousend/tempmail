@@ -72,7 +72,9 @@ button:disabled {
 .mailbox-card,
 .start-card,
 .section-header,
-.message-item {
+.message-item,
+.account-switcher,
+.auth-grid {
   align-items: center;
   display: flex;
   gap: 1rem;
@@ -98,6 +100,72 @@ button:disabled {
 .message-item small,
 .empty-state p {
   color: #68758c;
+}
+
+.auth-grid {
+  align-items: stretch;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.auth-card {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.auth-card input {
+  border: 1px solid rgba(23, 32, 51, 0.14);
+  border-radius: 14px;
+  font: inherit;
+  padding: 0.85rem 1rem;
+}
+
+.email-input-group {
+  align-items: stretch;
+  display: flex;
+}
+
+.email-input-group input {
+  border-radius: 14px 0 0 14px;
+  min-width: 0;
+  width: 100%;
+}
+
+.email-input-group .email-domain-input {
+  background: #eef2ff;
+  border-left: 0;
+  border-radius: 0 14px 14px 0;
+  color: #315efb;
+  flex: 0 0 auto;
+  font-weight: 700;
+  opacity: 1;
+  width: max(9rem, 38%);
+}
+
+.form-error {
+  color: #c2410c;
+  margin: 0;
+}
+
+.account-list,
+.message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.account-chip,
+.message-actions .ghost-button {
+  padding: 0.65rem 0.85rem;
+}
+
+.account-chip.active {
+  background: #0f172a;
+}
+
+.ghost-button.danger {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .inbox ul {

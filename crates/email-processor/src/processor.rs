@@ -3,20 +3,21 @@ use chrono::Duration;
 use mail_parser::{Addr, Address, MessageParser, MimeHeaders};
 use redis::aio::ConnectionManager;
 use shared::events::{DomainEvent, EmailReceivedEvent, EMAIL_RECEIVED_CHANNEL};
-use shared::keys::{mailbox_index_key, message_expiry_index_key, message_key};
-use shared::models::{EmailMessage, RawEmail};
+use shared::ids::new_uuid_v7;
+use shared::models::RawEmail;
 use shared::queue::{QueueMessage, RAW_EMAIL_PAYLOAD_FIELD};
-use shared::redis_helper::{publish_event, set_json};
+use shared::redis_helper::publish_event;
 use tokio::select;
 use tracing::{error, info, warn};
-use uuid::Uuid;
 
 use crate::config::EmailProcessorConfig;
+use crate::repository::{EmailRepository, ParsedMessage};
 use crate::storage::ObjectStorage;
 
 pub struct EmailProcessor {
     config: EmailProcessorConfig,
     redis: ConnectionManager,
+    repository: EmailRepository,
     object_storage: ObjectStorage,
 }
 
@@ -24,11 +25,13 @@ impl EmailProcessor {
     pub fn new(
         config: EmailProcessorConfig,
         redis: ConnectionManager,
+        repository: EmailRepository,
         object_storage: ObjectStorage,
     ) -> Self {
         Self {
             config,
             redis,
+            repository,
             object_storage,
         }
     }
@@ -75,45 +78,44 @@ impl EmailProcessor {
         let message: QueueMessage = serde_json::from_str(&entry.payload)?;
         let QueueMessage::RawEmail(raw_message) = message;
 
-        let email = build_email_message(
-            raw_message.email,
+        let raw_email = raw_message.email;
+        let raw_size_bytes = raw_email.data.len();
+        let mailbox = raw_email
+            .envelope
+            .rcpt_to
+            .first()
+            .cloned()
+            .ok_or_else(|| anyhow!("raw email has no recipient"))?;
+        let Some(account_id) = self.repository.find_account_id_by_address(&mailbox).await? else {
+            warn!(stream_id = %entry.id, %mailbox, "unknown recipient, dropping email");
+            return Ok(());
+        };
+
+        let parsed = build_parsed_message(
+            raw_email,
+            account_id,
+            raw_size_bytes,
             self.config.mailbox.ttl_seconds,
             &self.object_storage,
         )
         .await?;
-
-        let message_key = message_key(&email.mailbox, email.id);
-        set_json(
-            &mut self.redis,
-            &message_key,
-            &email,
-            self.config.mailbox.ttl_seconds + self.config.message_ttl_grace_seconds,
-        )
-        .await?;
-
-        let index_key = mailbox_index_key(&email.mailbox);
-        add_to_mailbox_index(
-            &mut self.redis,
-            &index_key,
-            email.id,
-            self.config.mailbox.ttl_seconds + self.config.message_ttl_grace_seconds,
-        )
-        .await?;
-        add_to_expiry_index(&mut self.redis, &email).await?;
+        let stored = self.repository.store_message(parsed).await?;
 
         let event = DomainEvent::EmailReceived(EmailReceivedEvent {
-            message_id: email.id,
-            mailbox: email.mailbox.clone(),
-            subject: email.subject.clone(),
-            from: email.from.clone(),
-            received_at: email.received_at,
+            account_id: stored.account_id,
+            message_id: stored.message_id,
+            mailbox: stored.mailbox.clone(),
+            subject: stored.subject.clone(),
+            from: stored.from.clone(),
+            received_at: stored.received_at,
         });
         publish_event(&mut self.redis, EMAIL_RECEIVED_CHANNEL, &event).await?;
 
         info!(
             stream_id = %entry.id,
-            message_id = %email.id,
-            mailbox = %email.mailbox,
+            account_id = %stored.account_id,
+            message_id = %stored.message_id,
+            mailbox = %stored.mailbox,
             "email processed"
         );
         Ok(())
@@ -244,54 +246,31 @@ async fn ack_message(
     Ok(())
 }
 
-async fn add_to_mailbox_index(
-    redis: &mut ConnectionManager,
-    index_key: &str,
-    message_id: Uuid,
-    ttl_seconds: u64,
-) -> Result<()> {
-    let _: usize = redis::cmd("LPUSH")
-        .arg(index_key)
-        .arg(message_id.to_string())
-        .query_async(redis)
-        .await?;
-    let _: bool = redis::cmd("EXPIRE")
-        .arg(index_key)
-        .arg(ttl_seconds)
-        .query_async(redis)
-        .await?;
-    Ok(())
-}
-
-async fn add_to_expiry_index(redis: &mut ConnectionManager, email: &EmailMessage) -> Result<()> {
-    let member = format!("{}|{}", email.mailbox, email.id);
-    let score = email.expires_at.timestamp();
-    let _: usize = redis::cmd("ZADD")
-        .arg(message_expiry_index_key())
-        .arg(score)
-        .arg(member)
-        .query_async(redis)
-        .await?;
-    Ok(())
-}
-
-async fn build_email_message(
+async fn build_parsed_message(
     raw: RawEmail,
-    ttl_seconds: u64,
+    account_id: uuid::Uuid,
+    raw_size_bytes: usize,
+    _ttl_seconds: u64,
     object_storage: &ObjectStorage,
-) -> Result<EmailMessage> {
+) -> Result<ParsedMessage> {
     let parsed = MessageParser::default()
         .parse(&raw.data)
         .ok_or_else(|| anyhow!("failed to parse raw email"))?;
 
-    let message_id = Uuid::new_v4();
+    let id = new_uuid_v7();
     let mailbox = raw
         .envelope
         .rcpt_to
         .first()
         .cloned()
         .ok_or_else(|| anyhow!("raw email has no recipient"))?;
-    let expires_at = raw.received_at + Duration::seconds(ttl_seconds as i64);
+    let from = parsed.from().and_then(first_addr);
+    let to_addresses = parsed
+        .to()
+        .map(addresses_to_json)
+        .unwrap_or_else(|| envelope_addresses_to_json(&raw.envelope.rcpt_to));
+    let cc_addresses = parsed.cc().map(addresses_to_json);
+    let bcc_addresses = parsed.bcc().map(addresses_to_json);
     let text_body = parsed.body_text(0).map(|body| body.into_owned());
     let html_body = parsed.body_html(0).map(|body| body.into_owned());
     let mut attachments = Vec::new();
@@ -311,30 +290,35 @@ async fn build_email_message(
             .map(ToOwned::to_owned);
 
         match object_storage
-            .put_attachment(message_id, filename, content_type, part.contents().to_vec())
+            .put_attachment(id, filename, content_type, part.contents().to_vec())
             .await?
         {
             Some(attachment) => attachments.push(attachment),
-            None => {
-                warn!(message_id = %message_id, "attachment skipped because R2 is not configured")
-            }
+            None => warn!(message_id = %id, "attachment skipped because R2 is not configured"),
         }
     }
 
-    Ok(EmailMessage {
-        id: message_id,
+    Ok(ParsedMessage {
+        id,
+        account_id,
         mailbox,
-        from: parsed.from().and_then(address_to_string),
-        to: parsed
-            .to()
-            .map(addresses_to_strings)
-            .unwrap_or_else(|| raw.envelope.rcpt_to.clone()),
+        message_id: parsed.message_id().map(ToOwned::to_owned),
+        in_reply_to: parsed.in_reply_to().as_text().map(ToOwned::to_owned),
+        from_address: from
+            .as_ref()
+            .map(|addr| addr.address.clone())
+            .unwrap_or_else(|| "unknown@unknown".to_owned()),
+        from_name: from.and_then(|addr| addr.name),
+        to_addresses,
+        cc_addresses,
+        bcc_addresses,
         subject: parsed.subject().map(ToOwned::to_owned),
         text_body,
         html_body,
-        attachments,
+        has_attachments: !attachments.is_empty(),
+        size_bytes: raw_size_bytes as i32,
         received_at: raw.received_at,
-        expires_at,
+        attachments,
     })
 }
 
@@ -345,16 +329,36 @@ fn content_type_to_string(content_type: &mail_parser::ContentType<'_>) -> String
     }
 }
 
-fn address_to_string(address: &Address<'_>) -> Option<String> {
-    address.iter().find_map(addr_to_string)
+fn first_addr(address: &Address<'_>) -> Option<OwnedAddress> {
+    address.iter().find_map(owned_addr)
 }
 
-fn addresses_to_strings(addresses: &Address<'_>) -> Vec<String> {
-    addresses.iter().filter_map(addr_to_string).collect()
+fn addresses_to_json(addresses: &Address<'_>) -> serde_json::Value {
+    serde_json::Value::Array(addresses.iter().filter_map(addr_to_json).collect())
 }
 
-fn addr_to_string(addr: &Addr<'_>) -> Option<String> {
-    addr.address().map(ToOwned::to_owned)
+fn envelope_addresses_to_json(addresses: &[String]) -> serde_json::Value {
+    serde_json::json!(addresses
+        .iter()
+        .map(|address| serde_json::json!({ "address": address, "name": null }))
+        .collect::<Vec<_>>())
+}
+
+fn addr_to_json(addr: &Addr<'_>) -> Option<serde_json::Value> {
+    addr.address()
+        .map(|address| serde_json::json!({ "address": address, "name": addr.name() }))
+}
+
+fn owned_addr(addr: &Addr<'_>) -> Option<OwnedAddress> {
+    addr.address().map(|address| OwnedAddress {
+        address: address.to_owned(),
+        name: addr.name().map(ToOwned::to_owned),
+    })
+}
+
+struct OwnedAddress {
+    address: String,
+    name: Option<String>,
 }
 
 struct StreamEntry {

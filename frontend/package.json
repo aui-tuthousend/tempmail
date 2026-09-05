@@ -5,9 +5,9 @@
   "packageManager": "bun@1.3.11",
   "scripts": {
     "dev": "vite dev --host 0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0",
-    "typecheck": "tsc --noEmit"
+    "build": "/home/iverson/.bun/bin/bun ./node_modules/vite/bin/vite.js build",
+    "preview": "/home/iverson/.bun/bin/bun ./node_modules/vite/bin/vite.js preview --host 0.0.0.0",
+    "typecheck": "/usr/bin/node ./node_modules/typescript/lib/tsc.js --noEmit"
   },
   "dependencies": {
     "@tanstack/react-query": "latest",

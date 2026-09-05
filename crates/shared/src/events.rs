@@ -12,6 +12,7 @@ pub enum DomainEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EmailReceivedEvent {
+    pub account_id: Uuid,
     pub message_id: Uuid,
     pub mailbox: String,
     pub subject: Option<String>,

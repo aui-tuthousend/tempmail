@@ -1,7 +1,7 @@
-import type { EmailMessage } from '../lib/api/types'
+import type { Message } from '../lib/api/types'
 
 type EmailDetailDialogProps = {
-  message: EmailMessage | null
+  message: Message | null
   onClose: () => void
 }
 
@@ -34,19 +34,19 @@ export function EmailDetailDialog({ message, onClose }: EmailDetailDialogProps) 
         <dl className="email-meta">
           <div>
             <dt>Dari</dt>
-            <dd>{message.from || 'Unknown sender'}</dd>
+            <dd>{formatSender(message)}</dd>
           </div>
           <div>
             <dt>Ke</dt>
-            <dd>{message.to.length > 0 ? message.to.join(', ') : '-'}</dd>
+            <dd>{formatAddresses(message.to_addresses)}</dd>
+          </div>
+          <div>
+            <dt>CC</dt>
+            <dd>{formatAddresses(message.cc_addresses)}</dd>
           </div>
           <div>
             <dt>Diterima</dt>
             <dd>{formatDate(message.received_at)}</dd>
-          </div>
-          <div>
-            <dt>Kedaluwarsa</dt>
-            <dd>{formatDate(message.expires_at)}</dd>
           </div>
         </dl>
 
@@ -55,19 +55,10 @@ export function EmailDetailDialog({ message, onClose }: EmailDetailDialogProps) 
           <pre>{body}</pre>
         </div>
 
-        {message.attachments.length > 0 && (
+        {message.has_attachments && (
           <div className="attachments">
             <h3>Attachments</h3>
-            <ul>
-              {message.attachments.map((attachment) => (
-                <li key={attachment.id}>
-                  <span>{attachment.filename || 'Unnamed attachment'}</span>
-                  <small>
-                    {attachment.content_type} · {formatBytes(attachment.size_bytes)}
-                  </small>
-                </li>
-              ))}
-            </ul>
+            <p className="muted">Attachment metadata tersimpan di backend.</p>
           </div>
         )}
       </section>
@@ -75,21 +66,25 @@ export function EmailDetailDialog({ message, onClose }: EmailDetailDialogProps) 
   )
 }
 
+function formatSender(message: Message) {
+  if (!message.from_name) {
+    return message.from_address
+  }
+
+  return `${message.from_name} <${message.from_address}>`
+}
+
+function formatAddresses(addresses: Message['to_addresses'] | Message['cc_addresses']) {
+  if (!addresses || addresses.length === 0) {
+    return '-'
+  }
+
+  return addresses.map((entry) => (entry.name ? `${entry.name} <${entry.address}>` : entry.address)).join(', ')
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('id-ID', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
-}
-
-function formatBytes(value: number) {
-  if (value < 1024) {
-    return `${value} B`
-  }
-
-  if (value < 1024 * 1024) {
-    return `${(value / 1024).toFixed(1)} KB`
-  }
-
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`
 }

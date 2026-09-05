@@ -1,27 +1,26 @@
 import { useEffect } from 'react'
 
-import { mailboxEventsUrl } from '../api/client'
+import { messageEventsUrl } from '../api/client'
 import type { EmailReceivedEvent } from '../api/types'
 import { queryClient } from '../queryClient'
+import { messagesQueryKey } from './useSession'
 
-export function useInboxEvents(mailbox: string | null) {
+export function useInboxEvents(isAuthenticated: boolean) {
   useEffect(() => {
-    if (!mailbox) {
+    if (!isAuthenticated) {
       return
     }
 
-    const events = new EventSource(mailboxEventsUrl(mailbox))
+    const events = new EventSource(messageEventsUrl(), { withCredentials: true })
 
     const refreshMessages = () => {
-      void queryClient.invalidateQueries({ queryKey: ['mailbox-messages', mailbox] })
+      void queryClient.invalidateQueries({ queryKey: messagesQueryKey })
     }
 
     events.addEventListener('email.received', (event) => {
       try {
-        const payload = JSON.parse(event.data) as EmailReceivedEvent
-        if (payload.mailbox === mailbox) {
-          refreshMessages()
-        }
+        JSON.parse(event.data) as EmailReceivedEvent
+        refreshMessages()
       } catch {
         refreshMessages()
       }
@@ -32,5 +31,5 @@ export function useInboxEvents(mailbox: string | null) {
     return () => {
       events.close()
     }
-  }, [mailbox])
+  }, [isAuthenticated])
 }

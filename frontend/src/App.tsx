@@ -1,59 +1,69 @@
+import { AccountSwitcher } from './components/AccountSwitcher'
+import { AuthPanel } from './components/AuthPanel'
 import { Inbox } from './components/Inbox'
-import { MailboxCard } from './components/MailboxCard'
 import { useInboxEvents } from './lib/hooks/useInboxEvents'
-import { useCreateMailbox } from './lib/hooks/useMailbox'
-import { useMessages } from './lib/hooks/useMessages'
-import { useStoredMailbox } from './lib/hooks/useStoredMailbox'
+import { useMessages, useUpdateMessage } from './lib/hooks/useMessages'
+import { useActivateSessionAccount, useCreateAccount, useLogin, useSessionAccounts } from './lib/hooks/useSession'
 
 export function App() {
-  const { mailbox, setMailbox } = useStoredMailbox()
-  const createMailbox = useCreateMailbox()
-  const address = mailbox?.address ?? null
-  const messages = useMessages(address)
+  const sessionAccounts = useSessionAccounts()
+  const accounts = sessionAccounts.data ?? []
+  const isAuthenticated = accounts.length > 0
+  const messages = useMessages(isAuthenticated)
+  const createAccount = useCreateAccount()
+  const login = useLogin()
+  const activateAccount = useActivateSessionAccount()
+  const updateMessage = useUpdateMessage()
 
-  useInboxEvents(address)
+  useInboxEvents(isAuthenticated)
 
-  const handleGenerate = () => {
-    createMailbox.mutate(undefined, {
-      onSuccess: setMailbox,
-    })
-  }
+  const authExpired = sessionAccounts.isError && !sessionAccounts.isFetching
 
   return (
     <main className="page-shell">
       <section className="hero">
         <p className="eyebrow">TempMail</p>
-        <h1>Disposable email inbox</h1>
-        <p>
-          Generate alamat sementara, terima email via SMTP, lalu lihat inbox terupdate otomatis lewat SSE.
-        </p>
+        <h1>Persistent email inbox</h1>
+        <p>Login ke account email permanen, switch antar-account dalam satu browser, dan terima inbox realtime via SSE.</p>
       </section>
 
-      {mailbox ? (
-        <MailboxCard
-          mailbox={mailbox.mailbox}
-          address={mailbox.address}
-          isGenerating={createMailbox.isPending}
-          onGenerate={handleGenerate}
-        />
-      ) : (
-        <section className="card start-card">
-          <div>
-            <p className="eyebrow">Mulai</p>
-            <h2>Buat temporary mailbox baru</h2>
-            <p className="muted">Mailbox akan aktif sesuai TTL yang dikonfigurasi di API server.</p>
-          </div>
-          <button type="button" onClick={handleGenerate} disabled={createMailbox.isPending}>
-            {createMailbox.isPending ? 'Generating...' : 'Generate mailbox'}
-          </button>
-        </section>
+      <AuthPanel
+        isRegistering={createAccount.isPending}
+        isLoggingIn={login.isPending}
+        registerError={createAccount.error?.message ?? null}
+        loginError={login.error?.message ?? null}
+        onRegister={(apiKey, payload) => createAccount.mutate({ apiKey, payload })}
+        onLogin={(payload) => login.mutate(payload)}
+      />
+
+      {authExpired && (
+        <section className="card error-state">Session belum ada atau sudah expired. Silakan login kembali.</section>
       )}
 
-      {createMailbox.isError && (
-        <section className="card error-state">Gagal membuat mailbox. Pastikan api-server berjalan.</section>
+      <AccountSwitcher
+        accounts={accounts}
+        isSwitching={activateAccount.isPending}
+        onActivate={(accountId) => activateAccount.mutate(accountId)}
+      />
+
+      {activateAccount.isError && <section className="card error-state">Gagal switch account.</section>}
+      {messages.isError && isAuthenticated && (
+        <section className="card error-state">Gagal memuat inbox. Session mungkin sudah expired.</section>
       )}
 
-      <Inbox messages={messages.data?.messages ?? []} isLoading={messages.isLoading} />
+      <Inbox
+        messages={messages.data ?? []}
+        isLoading={messages.isLoading}
+        isAuthenticated={isAuthenticated}
+        onToggleRead={(message) =>
+          updateMessage.mutate({ messageId: message.id, payload: { is_read: !message.is_read } })
+        }
+        onToggleStar={(message) =>
+          updateMessage.mutate({ messageId: message.id, payload: { is_starred: !message.is_starred } })
+        }
+        onArchive={(message) => updateMessage.mutate({ messageId: message.id, payload: { is_archived: true } })}
+        onDelete={(message) => updateMessage.mutate({ messageId: message.id, payload: { is_deleted: true } })}
+      />
     </main>
   )
 }

@@ -9,6 +9,11 @@ pub struct RedisConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct PostgresConfig {
+    pub database_url: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct QueueConfig {
     pub raw_email_stream: String,
     pub consumer_group: String,
@@ -44,6 +49,14 @@ impl RedisConfig {
     pub fn from_env() -> Result<Self> {
         Ok(Self {
             url: env_or("REDIS_URL", "redis://127.0.0.1:6379"),
+        })
+    }
+}
+
+impl PostgresConfig {
+    pub fn from_env() -> Result<Self> {
+        Ok(Self {
+            database_url: env_required("DATABASE_URL")?,
         })
     }
 }

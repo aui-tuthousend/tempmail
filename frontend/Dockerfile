@@ -3,7 +3,9 @@ FROM oven/bun:1.3.1 AS builder
 WORKDIR /app
 
 ARG VITE_API_BASE_URL=/api
+ARG VITE_MAILBOX_DOMAIN=intotheheap.net
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_MAILBOX_DOMAIN=$VITE_MAILBOX_DOMAIN
 
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile

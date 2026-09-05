@@ -4,6 +4,7 @@ use aws_credential_types::Credentials;
 use aws_sdk_s3::config::Region;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::Client;
+use shared::ids::new_uuid_v7;
 use shared::models::Attachment;
 use uuid::Uuid;
 
@@ -61,7 +62,7 @@ impl ObjectStorage {
             return Ok(None);
         };
 
-        let attachment_id = Uuid::new_v4();
+        let attachment_id = new_uuid_v7();
         let storage_key = format!("{}{message_id}/{attachment_id}", self.prefix);
         let size_bytes = bytes.len() as u64;
 
