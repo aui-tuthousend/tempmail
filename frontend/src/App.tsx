@@ -20,11 +20,15 @@ export function App() {
   const authExpired = sessionAccounts.isError && !sessionAccounts.isFetching
 
   return (
-    <main className="page-shell">
-      <section className="hero">
-        <p className="eyebrow">TempMail</p>
-        <h1>Persistent email inbox</h1>
-        <p>Login ke account email permanen, switch antar-account dalam satu browser, dan terima inbox realtime via SSE.</p>
+    <main className="mx-auto grid max-w-5xl gap-5 px-4 py-12">
+      <section className="py-4">
+        <p className="mb-3 text-xs font-extrabold uppercase tracking-widest text-indigo-600">TempMail</p>
+        <h1 className="max-w-4xl text-5xl font-black leading-none tracking-[-0.06em] text-slate-950 md:text-7xl">
+          Persistent email inbox
+        </h1>
+        <p className="mt-5 max-w-2xl text-base leading-7 text-slate-500">
+          Login ke account email permanen, switch antar-account dalam satu browser, dan terima inbox realtime via SSE.
+        </p>
       </section>
 
       <AuthPanel
@@ -37,7 +41,9 @@ export function App() {
       />
 
       {authExpired && (
-        <section className="card error-state">Session belum ada atau sudah expired. Silakan login kembali.</section>
+        <section className="rounded-3xl border border-orange-200 bg-orange-50 p-5 text-center font-medium text-orange-700">
+          Session belum ada atau sudah expired. Silakan login kembali.
+        </section>
       )}
 
       <AccountSwitcher
@@ -46,9 +52,15 @@ export function App() {
         onActivate={(accountId) => activateAccount.mutate(accountId)}
       />
 
-      {activateAccount.isError && <section className="card error-state">Gagal switch account.</section>}
+      {activateAccount.isError && (
+        <section className="rounded-3xl border border-orange-200 bg-orange-50 p-5 text-center font-medium text-orange-700">
+          Gagal switch account.
+        </section>
+      )}
       {messages.isError && isAuthenticated && (
-        <section className="card error-state">Gagal memuat inbox. Session mungkin sudah expired.</section>
+        <section className="rounded-3xl border border-orange-200 bg-orange-50 p-5 text-center font-medium text-orange-700">
+          Gagal memuat inbox. Session mungkin sudah expired.
+        </section>
       )}
 
       <Inbox

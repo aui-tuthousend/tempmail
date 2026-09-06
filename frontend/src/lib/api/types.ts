@@ -84,6 +84,13 @@ export type LoginResponse = {
   accounts: SessionAccount[]
 }
 
+export type AccountAvailabilityResponse = {
+  local_part_available: boolean | null
+  username_available: boolean | null
+}
+
+export type MessageView = 'inbox' | 'starred' | 'archived' | 'deleted'
+
 export type AddressEntry = {
   address: string
   name: string | null

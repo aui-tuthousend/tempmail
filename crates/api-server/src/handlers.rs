@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::time::Duration;
 
 use async_stream::stream;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::header::{COOKIE, SET_COOKIE};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -15,7 +15,8 @@ use shared::TempMailError;
 use tracing::{error, warn};
 
 use crate::dto::{
-    AccountIdPath, AccountResponse, CreateAccountRequest, ErrorResponse, GenerateMailboxResponse,
+    AccountAvailabilityQuery, AccountAvailabilityResponse, AccountIdPath, AccountResponse,
+    CreateAccountRequest, ErrorResponse, GenerateMailboxResponse, ListMessagesQuery,
     ListMessagesResponse, LoginRequest, LoginResponse, MailboxPath, MessageIdPath, MessageResponse,
     SessionAccountResponse, UpdateMessageRequest,
 };
@@ -50,6 +51,18 @@ pub async fn create_account(
         .create_account(api_key, request)
         .await
         .map(|account| (StatusCode::CREATED, Json(account.into())))
+        .map_err(error_response)
+}
+
+pub async fn account_availability(
+    State(state): State<AppState>,
+    Query(query): Query<AccountAvailabilityQuery>,
+) -> Result<Json<AccountAvailabilityResponse>, (StatusCode, Json<ErrorResponse>)> {
+    state
+        .account_service
+        .availability(query, &state.config.mailbox.domain)
+        .await
+        .map(Json)
         .map_err(error_response)
 }
 
@@ -122,14 +135,48 @@ pub async fn activate_session_account(
         .map_err(error_response)
 }
 
+pub async fn logout(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<
+    (StatusCode, HeaderMap, Json<Vec<SessionAccountResponse>>),
+    (StatusCode, Json<ErrorResponse>),
+> {
+    let cookie_name = &state.config.session_cookie_name;
+    let token = session_token_from_headers(&headers, cookie_name);
+    let accounts = state
+        .session_service
+        .logout_active_account(token.as_deref())
+        .await
+        .map_err(error_response)?;
+
+    let mut response_headers = HeaderMap::new();
+    if accounts.is_empty() {
+        response_headers.insert(
+            SET_COOKIE,
+            clear_session_cookie_header(cookie_name, state.config.session_cookie_secure).map_err(
+                |error| {
+                    error_response(TempMailError::InvalidEnv {
+                        name: "SESSION_COOKIE_NAME",
+                        message: error.to_string(),
+                    })
+                },
+            )?,
+        );
+    }
+
+    Ok((StatusCode::OK, response_headers, Json(accounts)))
+}
+
 pub async fn list_messages(
     State(state): State<AppState>,
     headers: HeaderMap,
+    Query(query): Query<ListMessagesQuery>,
 ) -> Result<Json<Vec<MessageResponse>>, (StatusCode, Json<ErrorResponse>)> {
     let token = session_token_from_headers(&headers, &state.config.session_cookie_name);
     state
         .message_service
-        .list_messages(token.as_deref())
+        .list_messages(token.as_deref(), query.view)
         .await
         .map(|messages| Json(messages.into_iter().map(MessageResponse::from).collect()))
         .map_err(error_response)
@@ -381,6 +428,19 @@ fn client_identifier(headers: &HeaderMap) -> String {
         })
         .unwrap_or("unknown")
         .to_owned()
+}
+
+fn clear_session_cookie_header(
+    cookie_name: &str,
+    secure: bool,
+) -> Result<HeaderValue, axum::http::header::InvalidHeaderValue> {
+    let mut cookie = format!("{cookie_name}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax");
+
+    if secure {
+        cookie.push_str("; Secure");
+    }
+
+    HeaderValue::from_str(&cookie)
 }
 
 fn session_cookie_header(

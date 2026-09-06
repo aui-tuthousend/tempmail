@@ -1,6 +1,8 @@
 import { useState } from 'react'
 
 import type { CreateAccountRequest, LoginRequest } from '../lib/api/types'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
 
 const mailboxDomain = import.meta.env.VITE_MAILBOX_DOMAIN ?? ''
 
@@ -44,9 +46,9 @@ export function AuthPanel({
   const [loginPassword, setLoginPassword] = useState('')
 
   return (
-    <section className="auth-grid">
+    <section className="grid items-stretch gap-4 md:grid-cols-2">
       <form
-        className="card auth-card"
+        className="grid gap-3 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-xl shadow-slate-900/5"
         onSubmit={(event) => {
           event.preventDefault()
           onRegister(apiKey, {
@@ -58,37 +60,38 @@ export function AuthPanel({
         }}
       >
         <div>
-          <p className="eyebrow">Register</p>
-          <h2>Buat account email</h2>
-          <p className="muted">Account baru membutuhkan API key valid. Domain email diambil dari env frontend.</p>
+          <p className="mb-2 text-xs font-extrabold uppercase tracking-widest text-indigo-600">Register</p>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-950">Buat account email</h2>
+          <p className="mt-2 text-sm text-slate-500">Account baru membutuhkan API key valid. Domain email diambil dari env frontend.</p>
         </div>
-        <input value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="API key" required />
-        <input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username" required />
-        <div className="email-input-group">
-          <input
+        <Input value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="API key" required />
+        <Input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username" required />
+        <div className="flex">
+          <Input
+            className="rounded-r-none"
             value={emailLocalPart}
             onChange={(event) => setEmailLocalPart(event.target.value)}
             placeholder="localpart email"
             required
           />
-          <input className="email-domain-input" value={`@${mailboxDomain || 'domain'}`} disabled readOnly />
+          <Input className="w-[38%] min-w-36 rounded-l-none border-l-0" value={`@${mailboxDomain || 'domain'}`} disabled readOnly />
         </div>
-        <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Display name opsional" />
-        <input
+        <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Display name opsional" />
+        <Input
           value={registerPassword}
           onChange={(event) => setRegisterPassword(event.target.value)}
           placeholder="Password"
           type="password"
           required
         />
-        <button type="submit" disabled={isRegistering}>
+        <Button type="submit" disabled={isRegistering}>
           {isRegistering ? 'Membuat...' : 'Buat account'}
-        </button>
-        {registerError && <p className="form-error">{registerError}</p>}
+        </Button>
+        {registerError && <p className="text-sm font-medium text-orange-700">{registerError}</p>}
       </form>
 
       <form
-        className="card auth-card"
+        className="grid gap-3 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-xl shadow-slate-900/5"
         onSubmit={(event) => {
           event.preventDefault()
           onLogin({
@@ -102,30 +105,31 @@ export function AuthPanel({
         }}
       >
         <div>
-          <p className="eyebrow">Login</p>
-          <h2>Masuk ke mailbox</h2>
-          <p className="muted">Login account lain di browser yang sama akan menambah account ke session ini.</p>
+          <p className="mb-2 text-xs font-extrabold uppercase tracking-widest text-indigo-600">Login</p>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-950">Masuk ke mailbox</h2>
+          <p className="mt-2 text-sm text-slate-500">Login account lain di browser yang sama akan menambah account ke session ini.</p>
         </div>
-        <div className="email-input-group">
-          <input
+        <div className="flex">
+          <Input
+            className="rounded-r-none"
             value={loginLocalPart}
             onChange={(event) => setLoginLocalPart(event.target.value)}
             placeholder="localpart email"
             required
           />
-          <input className="email-domain-input" value={`@${mailboxDomain || 'domain'}`} disabled readOnly />
+          <Input className="w-[38%] min-w-36 rounded-l-none border-l-0" value={`@${mailboxDomain || 'domain'}`} disabled readOnly />
         </div>
-        <input
+        <Input
           value={loginPassword}
           onChange={(event) => setLoginPassword(event.target.value)}
           placeholder="Password"
           type="password"
           required
         />
-        <button type="submit" disabled={isLoggingIn}>
+        <Button type="submit" disabled={isLoggingIn}>
           {isLoggingIn ? 'Login...' : 'Login'}
-        </button>
-        {loginError && <p className="form-error">{loginError}</p>}
+        </Button>
+        {loginError && <p className="text-sm font-medium text-orange-700">{loginError}</p>}
       </form>
     </section>
   )

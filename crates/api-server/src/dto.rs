@@ -33,6 +33,18 @@ pub struct CreateAccountRequest {
     pub display_name: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct AccountAvailabilityQuery {
+    pub local_part: Option<String>,
+    pub username: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AccountAvailabilityResponse {
+    pub local_part_available: Option<bool>,
+    pub username_available: Option<bool>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct AccountResponse {
     pub id: Uuid,
@@ -91,6 +103,20 @@ pub struct AccountIdPath {
 #[derive(Debug, Deserialize)]
 pub struct MessageIdPath {
     pub message_id: Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MessageView {
+    Inbox,
+    Starred,
+    Archived,
+    Deleted,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListMessagesQuery {
+    pub view: Option<MessageView>,
 }
 
 #[derive(Debug, Deserialize)]

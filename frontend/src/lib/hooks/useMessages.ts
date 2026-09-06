@@ -1,14 +1,14 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 
 import { listMessages, updateMessage } from '../api/client'
-import type { UpdateMessageRequest } from '../api/types'
+import type { MessageView, UpdateMessageRequest } from '../api/types'
 import { queryClient } from '../queryClient'
 import { messagesQueryKey } from './useSession'
 
-export function useMessages(isAuthenticated: boolean) {
+export function useMessages(isAuthenticated: boolean, view: MessageView = 'inbox') {
   return useQuery({
-    queryKey: messagesQueryKey,
-    queryFn: listMessages,
+    queryKey: [...messagesQueryKey, view] as const,
+    queryFn: () => listMessages(view),
     enabled: isAuthenticated,
     retry: false,
   })

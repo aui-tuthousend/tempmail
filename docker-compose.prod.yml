@@ -16,7 +16,7 @@ services:
       - dragonfly
     environment:
       RUST_LOG: info
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql://neondb_owner:npg_XrhWf5CAnb1T@ep-still-wildflower-b36ozr4l-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       REDIS_URL: redis://dragonfly:6379
       MAILBOX_DOMAIN: intotheheap.net
       MAILBOX_TTL_SECONDS: 3600
@@ -70,7 +70,7 @@ services:
       - dragonfly
     environment:
       RUST_LOG: info
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql://neondb_owner:npg_XrhWf5CAnb1T@ep-still-wildflower-b36ozr4l-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       REDIS_URL: redis://dragonfly:6379
       QUEUE_RAW_EMAIL_STREAM: email_raw
       REDIS_CONSUMER_GROUP: email-processor

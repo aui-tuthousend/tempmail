@@ -7,7 +7,7 @@ use shared::redis_helper::{get_json, set_json};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use crate::dto::SessionAccountResponse;
+use crate::dto::{MessageView, SessionAccountResponse};
 
 #[derive(Clone)]
 pub struct MailboxRepository {
@@ -114,6 +114,41 @@ pub struct AccountRepository {
 impl AccountRepository {
     pub fn new(db: PgPool) -> Self {
         Self { db }
+    }
+
+    pub async fn availability(
+        &self,
+        local_part: Option<&str>,
+        username: Option<&str>,
+        domain: &str,
+    ) -> Result<(Option<bool>, Option<bool>), sqlx::Error> {
+        let local_part_available = match local_part {
+            Some(value) if !value.is_empty() => {
+                let exists: bool = sqlx::query_scalar(
+                    "SELECT EXISTS(SELECT 1 FROM accounts WHERE local_part = $1 AND domain = $2)",
+                )
+                .bind(value)
+                .bind(domain)
+                .fetch_one(&self.db)
+                .await?;
+                Some(!exists)
+            }
+            _ => None,
+        };
+
+        let username_available = match username {
+            Some(value) if !value.is_empty() => {
+                let exists: bool =
+                    sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM accounts WHERE username = $1)")
+                        .bind(value)
+                        .fetch_one(&self.db)
+                        .await?;
+                Some(!exists)
+            }
+            _ => None,
+        };
+
+        Ok((local_part_available, username_available))
     }
 
     pub async fn create(&self, account: NewAccount) -> Result<Account, sqlx::Error> {
@@ -342,6 +377,61 @@ impl SessionRepository {
             .collect())
     }
 
+    pub async fn logout_active_account(&self, session_id: Uuid) -> Result<bool, sqlx::Error> {
+        let mut tx = self.db.begin().await?;
+
+        let active_account_id = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            DELETE FROM session_accounts
+            WHERE session_id = $1 AND is_active = true
+            RETURNING account_id
+            "#,
+        )
+        .bind(session_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if active_account_id.is_none() {
+            tx.rollback().await?;
+            return Ok(false);
+        }
+
+        let replacement_account_id = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            SELECT account_id
+            FROM session_accounts
+            WHERE session_id = $1
+            ORDER BY logged_in_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(session_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if let Some(account_id) = replacement_account_id {
+            sqlx::query(
+                r#"
+                UPDATE session_accounts
+                SET is_active = true
+                WHERE session_id = $1 AND account_id = $2
+                "#,
+            )
+            .bind(session_id)
+            .bind(account_id)
+            .execute(&mut *tx)
+            .await?;
+        } else {
+            sqlx::query("DELETE FROM sessions WHERE id = $1")
+                .bind(session_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+
+        tx.commit().await?;
+        Ok(true)
+    }
+
     pub async fn activate_account(
         &self,
         session_id: Uuid,
@@ -435,8 +525,18 @@ impl MessageRepository {
         .await
     }
 
-    pub async fn list_inbox(&self, account_id: Uuid) -> Result<Vec<StoredMessage>, sqlx::Error> {
-        let rows = sqlx::query(
+    pub async fn list_by_view(
+        &self,
+        account_id: Uuid,
+        view: Option<MessageView>,
+    ) -> Result<Vec<StoredMessage>, sqlx::Error> {
+        let filter = match view.unwrap_or(MessageView::Inbox) {
+            MessageView::Inbox => "is_deleted = false AND is_archived = false",
+            MessageView::Starred => "is_deleted = false AND is_starred = true",
+            MessageView::Archived => "is_deleted = false AND is_archived = true",
+            MessageView::Deleted => "is_deleted = true",
+        };
+        let query = format!(
             r#"
             SELECT
                 id,
@@ -462,14 +562,15 @@ impl MessageRepository {
                 updated_at
             FROM messages
             WHERE account_id = $1
-              AND is_deleted = false
-              AND is_archived = false
+              AND {filter}
             ORDER BY received_at DESC
-            "#,
-        )
-        .bind(account_id)
-        .fetch_all(&self.db)
-        .await?;
+            "#
+        );
+
+        let rows = sqlx::query(&query)
+            .bind(account_id)
+            .fetch_all(&self.db)
+            .await?;
 
         Ok(rows.iter().map(stored_message_from_row).collect())
     }

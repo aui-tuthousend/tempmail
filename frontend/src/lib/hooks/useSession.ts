@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 
-import { activateSessionAccount, createAccount, listSessionAccounts, login } from '../api/client'
+import { activateSessionAccount, createAccount, listSessionAccounts, login, logout } from '../api/client'
 import type { CreateAccountRequest, LoginRequest } from '../api/types'
 import { queryClient } from '../queryClient'
 
@@ -35,6 +35,16 @@ export function useLogin() {
 export function useActivateSessionAccount() {
   return useMutation({
     mutationFn: activateSessionAccount,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: sessionAccountsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: messagesQueryKey })
+    },
+  })
+}
+
+export function useLogout() {
+  return useMutation({
+    mutationFn: logout,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: sessionAccountsQueryKey })
       void queryClient.invalidateQueries({ queryKey: messagesQueryKey })

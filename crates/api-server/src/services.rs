@@ -7,7 +7,8 @@ use tracing::{error, warn};
 use uuid::Uuid;
 
 use crate::dto::{
-    CreateAccountRequest, LoginRequest, LoginResponse, SessionAccountResponse, UpdateMessageRequest,
+    AccountAvailabilityQuery, AccountAvailabilityResponse, CreateAccountRequest, LoginRequest,
+    LoginResponse, MessageView, SessionAccountResponse, UpdateMessageRequest,
 };
 use crate::repositories::{
     AccountRepository, ApiKeyRepository, MailboxRepository, MessageFlagsUpdate, MessageRepository,
@@ -102,6 +103,36 @@ impl AccountService {
             password_service,
             token_service,
         }
+    }
+
+    pub async fn availability(
+        &self,
+        query: AccountAvailabilityQuery,
+        domain: &str,
+    ) -> Result<AccountAvailabilityResponse> {
+        let local_part = query
+            .local_part
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_lowercase);
+        let username = query
+            .username
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned);
+
+        let (local_part_available, username_available) = self
+            .account_repository
+            .availability(local_part.as_deref(), username.as_deref(), domain)
+            .await
+            .map_err(|_| TempMailError::AuthorizationFailed)?;
+
+        Ok(AccountAvailabilityResponse {
+            local_part_available,
+            username_available,
+        })
     }
 
     pub async fn create_account(
@@ -247,6 +278,24 @@ impl SessionService {
         self.session_accounts_by_id(session.id).await
     }
 
+    pub async fn logout_active_account(
+        &self,
+        token: Option<&str>,
+    ) -> Result<Vec<SessionAccountResponse>> {
+        let session = self.require_session(token).await?;
+        let logged_out = self
+            .repository
+            .logout_active_account(session.id)
+            .await
+            .map_err(|_| TempMailError::InvalidSession)?;
+
+        if !logged_out {
+            return Err(TempMailError::InvalidSession);
+        }
+
+        self.session_accounts_by_id(session.id).await
+    }
+
     pub async fn active_account_id(&self, token: Option<&str>) -> Result<Uuid> {
         let session = self.require_session(token).await?;
         let accounts = self.session_accounts_by_id(session.id).await?;
@@ -332,10 +381,14 @@ impl MessageService {
         }
     }
 
-    pub async fn list_messages(&self, token: Option<&str>) -> Result<Vec<StoredMessage>> {
+    pub async fn list_messages(
+        &self,
+        token: Option<&str>,
+        view: Option<MessageView>,
+    ) -> Result<Vec<StoredMessage>> {
         let account_id = self.session_service.active_account_id(token).await?;
         self.repository
-            .list_inbox(account_id)
+            .list_by_view(account_id, view)
             .await
             .map_err(|_| TempMailError::AuthorizationFailed)
     }

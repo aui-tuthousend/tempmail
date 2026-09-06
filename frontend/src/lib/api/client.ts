@@ -1,11 +1,13 @@
 import type {
   Account,
+  AccountAvailabilityResponse,
   CreateAccountRequest,
   GenerateMailboxResponse,
   ListMailboxMessagesResponse,
   LoginRequest,
   LoginResponse,
   Message,
+  MessageView,
   SessionAccount,
   UpdateMessageRequest,
 } from './types'
@@ -72,6 +74,24 @@ export function login(payload: LoginRequest) {
   })
 }
 
+export function logout() {
+  return request<SessionAccount[]>('/sessions/logout', { method: 'POST' })
+}
+
+export function accountAvailability(params: { local_part?: string; username?: string }) {
+  const query = new URLSearchParams()
+
+  if (params.local_part) {
+    query.set('local_part', params.local_part)
+  }
+
+  if (params.username) {
+    query.set('username', params.username)
+  }
+
+  return request<AccountAvailabilityResponse>(`/accounts/availability?${query.toString()}`)
+}
+
 export function listSessionAccounts() {
   return request<SessionAccount[]>('/session/accounts')
 }
@@ -82,8 +102,9 @@ export function activateSessionAccount(accountId: string) {
   })
 }
 
-export function listMessages() {
-  return request<Message[]>('/messages')
+export function listMessages(view?: MessageView) {
+  const query = view && view !== 'inbox' ? `?view=${view}` : ''
+  return request<Message[]>(`/messages${query}`)
 }
 
 export function getMessage(messageId: string) {
