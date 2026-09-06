@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
+import { createFileRoute, isRedirect, Outlet, redirect } from '@tanstack/react-router'
 
 import { MailHeader } from '../components/mail/MailHeader'
 import { MailSidebar } from '../components/mail/MailSidebar'
@@ -15,7 +15,7 @@ export const Route = createFileRoute('/_app')({
         throw redirect({ to: '/login' })
       }
     } catch (error) {
-      if (isRouteRedirect(error)) {
+      if (isRedirect(error)) {
         throw error
       }
 
@@ -52,6 +52,3 @@ function ShellContent() {
   )
 }
 
-function isRouteRedirect(error: unknown) {
-  return typeof error === 'object' && error !== null && 'isRedirect' in error
-}
