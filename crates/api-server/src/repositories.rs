@@ -667,6 +667,20 @@ impl MessageRepository {
 
         Ok(row.as_ref().map(stored_message_from_row))
     }
+
+    pub async fn delete_for_account(
+        &self,
+        message_id: Uuid,
+        account_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM messages WHERE id = $1 AND account_id = $2")
+            .bind(message_id)
+            .bind(account_id)
+            .execute(&self.db)
+            .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
 }
 
 fn stored_message_from_row(row: &sqlx::postgres::PgRow) -> StoredMessage {

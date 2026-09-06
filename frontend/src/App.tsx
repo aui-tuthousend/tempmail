@@ -67,13 +67,13 @@ export function App() {
         messages={messages.data ?? []}
         isLoading={messages.isLoading}
         isAuthenticated={isAuthenticated}
-        onToggleRead={(message) =>
-          updateMessage.mutate({ messageId: message.id, payload: { is_read: !message.is_read } })
+        onMarkRead={(message) =>
+          updateMessage.mutate({ messageId: message.id, payload: { is_read: true } })
         }
         onToggleStar={(message) =>
           updateMessage.mutate({ messageId: message.id, payload: { is_starred: !message.is_starred } })
         }
-        onArchive={(message) => updateMessage.mutate({ messageId: message.id, payload: { is_archived: true } })}
+        onToggleArchive={(message) => updateMessage.mutate({ messageId: message.id, payload: { is_archived: !message.is_archived } })}
         onDelete={(message) => updateMessage.mutate({ messageId: message.id, payload: { is_deleted: true } })}
       />
     </main>

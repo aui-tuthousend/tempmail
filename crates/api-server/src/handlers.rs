@@ -213,6 +213,20 @@ pub async fn update_message(
         .map_err(error_response)
 }
 
+pub async fn delete_message(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(path): Path<MessageIdPath>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+    let token = session_token_from_headers(&headers, &state.config.session_cookie_name);
+    state
+        .message_service
+        .delete_message(token.as_deref(), path.message_id)
+        .await
+        .map(|()| StatusCode::NO_CONTENT)
+        .map_err(error_response)
+}
+
 pub async fn generate_mailbox(State(state): State<AppState>) -> Json<GenerateMailboxResponse> {
     let mailbox = state.mailbox_service.generate_mailbox().await;
 

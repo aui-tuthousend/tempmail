@@ -118,6 +118,18 @@ export function updateMessage(messageId: string, payload: UpdateMessageRequest) 
   })
 }
 
+export async function deleteMessage(messageId: string) {
+  const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const body = await response.text()
+    throw new Error(errorMessage(body, response.status))
+  }
+}
+
 export function messageEventsUrl() {
   return `${API_BASE_URL}/messages/events`
 }

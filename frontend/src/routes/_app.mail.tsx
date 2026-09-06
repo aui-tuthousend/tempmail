@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Outlet } from '@tanstack/react-router'
 import { RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -7,26 +7,27 @@ import { useMailSearch } from '../components/mail/search-context'
 import { Button } from '../components/ui/button'
 import type { Message, MessageView } from '../lib/api/types'
 import { useInboxEvents } from '../lib/hooks/useInboxEvents'
-import { useMessages, useUpdateMessage } from '../lib/hooks/useMessages'
+import { useDeleteMessage, useMessages, useUpdateMessage } from '../lib/hooks/useMessages'
 
 export const Route = createFileRoute('/_app/mail')({
-  component: MailIndexPage,
+  component: MailLayout,
 })
 
-function MailIndexPage() {
-  return <MailView view="inbox" title="Inbox" />
+function MailLayout() {
+  return <Outlet />
 }
 
 export function MailView({ view, title }: { view: MessageView; title: string }) {
   const { search } = useMailSearch()
   const messages = useMessages(true, view)
   const updateMessage = useUpdateMessage()
+  const deleteMessage = useDeleteMessage()
   const visibleMessages = filterMessages(messages.data ?? [], search)
 
   useInboxEvents(view === 'inbox')
 
   return (
-    <section className="grid gap-5">
+    <section className="flex h-full min-h-0 flex-col gap-5 overflow-hidden">
       <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-xl shadow-slate-900/5 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="mb-2 text-xs font-extrabold uppercase tracking-widest text-indigo-600">Mailbox</p>
@@ -54,24 +55,28 @@ export function MailView({ view, title }: { view: MessageView; title: string }) 
 
       <Inbox
         messages={visibleMessages}
+        view={view}
         isLoading={messages.isLoading}
         isAuthenticated
-        onToggleRead={(message) =>
+        onMarkRead={(message) =>
           updateMessage.mutate(
-            { messageId: message.id, payload: { is_read: !message.is_read } },
-            { onSuccess: () => toast.success('Status read diperbarui'), onError: (error) => toast.error(error.message) },
+            { messageId: message.id, payload: { is_read: true } },
+            { onError: (error) => toast.error(error.message) },
           )
         }
         onToggleStar={(message) =>
           updateMessage.mutate(
             { messageId: message.id, payload: { is_starred: !message.is_starred } },
-            { onSuccess: () => toast.success('Status star diperbarui'), onError: (error) => toast.error(error.message) },
+            { onError: (error) => toast.error(error.message) },
           )
         }
-        onArchive={(message) =>
+        onToggleArchive={(message) =>
           updateMessage.mutate(
-            { messageId: message.id, payload: { is_archived: true } },
-            { onSuccess: () => toast.success('Email diarsipkan'), onError: (error) => toast.error(error.message) },
+            { messageId: message.id, payload: { is_archived: !message.is_archived } },
+            {
+              onSuccess: () => toast.success(message.is_archived ? 'Email dikembalikan ke inbox' : 'Email diarsipkan'),
+              onError: (error) => toast.error(error.message),
+            },
           )
         }
         onDelete={(message) =>
@@ -79,6 +84,18 @@ export function MailView({ view, title }: { view: MessageView; title: string }) 
             { messageId: message.id, payload: { is_deleted: true } },
             { onSuccess: () => toast.success('Email dihapus'), onError: (error) => toast.error(error.message) },
           )
+        }
+        onRestore={(message) =>
+          updateMessage.mutate(
+            { messageId: message.id, payload: { is_deleted: false } },
+            { onSuccess: () => toast.success('Email dipulihkan'), onError: (error) => toast.error(error.message) },
+          )
+        }
+        onPermanentDelete={(message) =>
+          deleteMessage.mutate(message.id, {
+            onSuccess: () => toast.success('Email dihapus permanen'),
+            onError: (error) => toast.error(error.message),
+          })
         }
       />
     </section>

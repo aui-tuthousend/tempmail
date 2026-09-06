@@ -81,7 +81,13 @@ async fn main() -> Result<()> {
 
 fn cors_layer(allowed_origins: &str) -> Result<CorsLayer> {
     let layer = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::OPTIONS])
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PATCH,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
         .allow_headers(AllowHeaders::mirror_request())
         .allow_credentials(true);
 

@@ -426,6 +426,21 @@ impl MessageService {
             .map_err(|_| TempMailError::AuthorizationFailed)?
             .ok_or(TempMailError::AuthorizationFailed)
     }
+
+    pub async fn delete_message(&self, token: Option<&str>, message_id: Uuid) -> Result<()> {
+        let account_id = self.session_service.active_account_id(token).await?;
+        let deleted = self
+            .repository
+            .delete_for_account(message_id, account_id)
+            .await
+            .map_err(|_| TempMailError::AuthorizationFailed)?;
+
+        if deleted {
+            Ok(())
+        } else {
+            Err(TempMailError::AuthorizationFailed)
+        }
+    }
 }
 
 fn active_account_id(accounts: &[SessionAccountResponse]) -> Option<Uuid> {

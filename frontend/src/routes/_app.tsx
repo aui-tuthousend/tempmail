@@ -38,12 +38,12 @@ function ShellContent() {
   const { search, setSearch } = useMailSearch()
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-950">
-      <div className="flex min-h-screen">
+    <div className="h-screen overflow-hidden bg-slate-100 text-slate-950">
+      <div className="flex h-screen overflow-hidden">
         <MailSidebar />
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <MailHeader accounts={sessionAccounts.data ?? []} search={search} onSearchChange={setSearch} />
-          <div className="p-4 md:p-6">
+          <div className="min-h-0 flex-1 overflow-hidden p-4 md:p-6">
             <Outlet />
           </div>
         </main>

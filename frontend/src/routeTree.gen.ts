@@ -14,6 +14,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as AppMailRouteImport } from './routes/_app.mail'
+import { Route as AppMailIndexRouteImport } from './routes/_app.mail.index'
 import { Route as AppMailArchivedRouteImport } from './routes/_app.mail.archived'
 import { Route as AppMailDeletedRouteImport } from './routes/_app.mail.deleted'
 import { Route as AppMailStarredRouteImport } from './routes/_app.mail.starred'
@@ -42,6 +43,11 @@ const AppMailRoute = AppMailRouteImport.update({
   path: '/mail',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMailIndexRoute = AppMailIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppMailRoute,
+} as any)
 const AppMailArchivedRoute = AppMailArchivedRouteImport.update({
   id: '/archived',
   path: '/archived',
@@ -66,15 +72,16 @@ export interface FileRoutesByFullPath {
   '/mail/archived': typeof AppMailArchivedRoute
   '/mail/deleted': typeof AppMailDeletedRoute
   '/mail/starred': typeof AppMailStarredRoute
+  '/mail/': typeof AppMailIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
-  '/mail': typeof AppMailRouteWithChildren
   '/mail/archived': typeof AppMailArchivedRoute
   '/mail/deleted': typeof AppMailDeletedRoute
   '/mail/starred': typeof AppMailStarredRoute
+  '/mail': typeof AppMailIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -86,6 +93,7 @@ export interface FileRoutesById {
   '/_app/mail/archived': typeof AppMailArchivedRoute
   '/_app/mail/deleted': typeof AppMailDeletedRoute
   '/_app/mail/starred': typeof AppMailStarredRoute
+  '/_app/mail/': typeof AppMailIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -97,15 +105,16 @@ export interface FileRouteTypes {
     | '/mail/archived'
     | '/mail/deleted'
     | '/mail/starred'
+    | '/mail/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/register'
-    | '/mail'
     | '/mail/archived'
     | '/mail/deleted'
     | '/mail/starred'
+    | '/mail'
   id:
     | '__root__'
     | '/'
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/_app/mail/archived'
     | '/_app/mail/deleted'
     | '/_app/mail/starred'
+    | '/_app/mail/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -162,6 +172,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMailRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/mail/': {
+      id: '/_app/mail/'
+      path: '/'
+      fullPath: '/mail/'
+      preLoaderRoute: typeof AppMailIndexRouteImport
+      parentRoute: typeof AppMailRoute
+    }
     '/_app/mail/archived': {
       id: '/_app/mail/archived'
       path: '/archived'
@@ -190,12 +207,14 @@ interface AppMailRouteChildren {
   AppMailArchivedRoute: typeof AppMailArchivedRoute
   AppMailDeletedRoute: typeof AppMailDeletedRoute
   AppMailStarredRoute: typeof AppMailStarredRoute
+  AppMailIndexRoute: typeof AppMailIndexRoute
 }
 
 const AppMailRouteChildren: AppMailRouteChildren = {
   AppMailArchivedRoute: AppMailArchivedRoute,
   AppMailDeletedRoute: AppMailDeletedRoute,
   AppMailStarredRoute: AppMailStarredRoute,
+  AppMailIndexRoute: AppMailIndexRoute,
 }
 
 const AppMailRouteWithChildren =

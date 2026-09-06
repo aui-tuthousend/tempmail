@@ -6,9 +6,9 @@ use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetReques
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 
 use crate::handlers::{
-    account_availability, activate_session_account, create_account, generate_mailbox, get_message,
-    health, inbox_events, list_mailbox_messages, list_messages, login, logout, message_events,
-    session_accounts, update_message,
+    account_availability, activate_session_account, create_account, delete_message,
+    generate_mailbox, get_message, health, inbox_events, list_mailbox_messages, list_messages,
+    login, logout, message_events, session_accounts, update_message,
 };
 use crate::state::AppState;
 
@@ -30,7 +30,9 @@ pub fn router(state: AppState, cors: CorsLayer) -> Router {
         .route("/messages/events", get(message_events))
         .route(
             "/messages/:message_id",
-            get(get_message).patch(update_message),
+            get(get_message)
+                .patch(update_message)
+                .delete(delete_message),
         )
         .route("/mailboxes", post(generate_mailbox))
         .route("/mailboxes/:mailbox/messages", get(list_mailbox_messages))
