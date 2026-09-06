@@ -7,7 +7,7 @@ use api_server::routes::router;
 use api_server::services::{
     AccountService, EventService, MailboxService, MessageService, SessionService,
 };
-use api_server::state::AppState;
+use api_server::state::{AppServices, AppState};
 use axum::http::{HeaderValue, Method};
 use shared::auth::{PasswordService, TokenService};
 use sqlx::postgres::PgPoolOptions;
@@ -61,18 +61,15 @@ async fn main() -> Result<()> {
 
     let bind_addr = config.bind_addr.clone();
     let cors = cors_layer(&config.allowed_origins)?;
+    let services = AppServices {
+        mailbox_service,
+        event_service,
+        account_service,
+        session_service,
+        message_service,
+    };
     let app = router(
-        AppState::new(
-            config,
-            db,
-            redis.clone(),
-            redis,
-            mailbox_service,
-            event_service,
-            account_service,
-            session_service,
-            message_service,
-        ),
+        AppState::new(config, db, redis.clone(), redis, services),
         cors,
     );
     let listener = tokio::net::TcpListener::bind(&bind_addr).await?;

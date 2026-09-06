@@ -10,6 +10,15 @@ use crate::services::{
 };
 
 #[derive(Clone)]
+pub struct AppServices {
+    pub mailbox_service: MailboxService,
+    pub event_service: EventService,
+    pub account_service: AccountService,
+    pub session_service: SessionService,
+    pub message_service: MessageService,
+}
+
+#[derive(Clone)]
 pub struct AppState {
     pub config: Arc<ApiConfig>,
     pub db: PgPool,
@@ -28,22 +37,18 @@ impl AppState {
         db: PgPool,
         redis: ConnectionManager,
         rate_limit_redis: ConnectionManager,
-        mailbox_service: MailboxService,
-        event_service: EventService,
-        account_service: AccountService,
-        session_service: SessionService,
-        message_service: MessageService,
+        services: AppServices,
     ) -> Self {
         Self {
             config: Arc::new(config),
             db,
             redis,
             rate_limit_redis: Arc::new(Mutex::new(rate_limit_redis)),
-            mailbox_service,
-            event_service,
-            account_service,
-            session_service,
-            message_service,
+            mailbox_service: services.mailbox_service,
+            event_service: services.event_service,
+            account_service: services.account_service,
+            session_service: services.session_service,
+            message_service: services.message_service,
         }
     }
 }

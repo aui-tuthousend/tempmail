@@ -403,7 +403,7 @@ async fn rate_limit(
 
     if count == 1 {
         let _: bool = redis
-            .expire(&key, state.config.auth_rate_limit_window_seconds as i64)
+            .expire(&key, state.config.auth_rate_limit_window_seconds)
             .await?;
     }
 
