@@ -85,7 +85,7 @@ export function RegisterForm() {
         )}
       </div>
 
-      <Button type="button" variant="outline" onClick={() => setLocalPart(randomLocalPart())}>
+      <Button type="button" variant="default" onClick={() => setLocalPart(randomLocalPart())}>
         Generate random localpart
       </Button>
 
