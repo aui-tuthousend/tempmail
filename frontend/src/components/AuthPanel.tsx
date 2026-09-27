@@ -5,6 +5,7 @@ import { Button } from './ui/button'
 import { Input } from './ui/input'
 
 const mailboxDomain = import.meta.env.VITE_MAILBOX_DOMAIN ?? ''
+const DEFAULT_REGISTER_PASSWORD = 'Walawe123!'
 
 function normalizeLocalPart(value: string) {
   return value.trim().toLowerCase().split('@')[0]
@@ -20,12 +21,18 @@ function joinMailboxAddress(localPart: string) {
   return `${value}@${mailboxDomain}`
 }
 
+function randomLocalPart() {
+  const random = new Uint32Array(1)
+  crypto.getRandomValues(random)
+  return `user${random[0].toString(36)}`
+}
+
 type AuthPanelProps = {
   isRegistering: boolean
   isLoggingIn: boolean
   registerError: string | null
   loginError: string | null
-  onRegister: (apiKey: string, payload: CreateAccountRequest) => void
+  onRegister: (payload: CreateAccountRequest) => void
   onLogin: (payload: LoginRequest) => void
 }
 
@@ -37,11 +44,7 @@ export function AuthPanel({
   onRegister,
   onLogin,
 }: AuthPanelProps) {
-  const [apiKey, setApiKey] = useState('')
-  const [username, setUsername] = useState('')
   const [emailLocalPart, setEmailLocalPart] = useState('')
-  const [displayName, setDisplayName] = useState('')
-  const [registerPassword, setRegisterPassword] = useState('')
   const [loginLocalPart, setLoginLocalPart] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
 
@@ -51,39 +54,33 @@ export function AuthPanel({
         className="grid gap-3 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-xl shadow-slate-900/5"
         onSubmit={(event) => {
           event.preventDefault()
-          onRegister(apiKey, {
-            username,
-            email: joinMailboxAddress(emailLocalPart),
-            password: registerPassword,
-            display_name: displayName || null,
+          const localPart = normalizeLocalPart(emailLocalPart)
+          onRegister({
+            username: localPart,
+            email: joinMailboxAddress(localPart),
+            password: DEFAULT_REGISTER_PASSWORD,
+            display_name: null,
           })
         }}
       >
         <div>
           <p className="mb-2 text-xs font-extrabold uppercase tracking-widest text-indigo-600">Register</p>
           <h2 className="text-2xl font-bold tracking-tight text-slate-950">Buat account email</h2>
-          <p className="mt-2 text-sm text-slate-500">Account baru membutuhkan API key valid. Domain email diambil dari env frontend.</p>
+          <p className="mt-2 text-sm text-slate-500">Cukup isi localpart. Username sama dengan localpart, password awal: {DEFAULT_REGISTER_PASSWORD}</p>
         </div>
-        <Input value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="API key" required />
-        <Input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username" required />
         <div className="flex">
           <Input
             className="rounded-r-none"
             value={emailLocalPart}
-            onChange={(event) => setEmailLocalPart(event.target.value)}
+            onChange={(event) => setEmailLocalPart(normalizeLocalPart(event.target.value))}
             placeholder="localpart email"
             required
           />
           <Input className="w-[38%] min-w-36 rounded-l-none border-l-0" value={`@${mailboxDomain || 'domain'}`} disabled readOnly />
         </div>
-        <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Display name opsional" />
-        <Input
-          value={registerPassword}
-          onChange={(event) => setRegisterPassword(event.target.value)}
-          placeholder="Password"
-          type="password"
-          required
-        />
+        <Button type="button" variant="default" onClick={() => setEmailLocalPart(randomLocalPart())}>
+          Generate random localpart
+        </Button>
         <Button type="submit" disabled={isRegistering}>
           {isRegistering ? 'Membuat...' : 'Buat account'}
         </Button>

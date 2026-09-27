@@ -36,7 +36,7 @@ export function App() {
         isLoggingIn={login.isPending}
         registerError={createAccount.error?.message ?? null}
         loginError={login.error?.message ?? null}
-        onRegister={(apiKey, payload) => createAccount.mutate({ apiKey, payload })}
+        onRegister={(payload) => createAccount.mutate(payload)}
         onLogin={(payload) => login.mutate(payload)}
       />
 

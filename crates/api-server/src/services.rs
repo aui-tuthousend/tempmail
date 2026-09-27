@@ -11,8 +11,8 @@ use crate::dto::{
     LoginResponse, MessageView, SessionAccountResponse, UpdateMessageRequest,
 };
 use crate::repositories::{
-    AccountRepository, ApiKeyRepository, MailboxRepository, MessageFlagsUpdate, MessageRepository,
-    NewAccount, NewSession, SessionRepository,
+    AccountRepository, MailboxRepository, MessageFlagsUpdate, MessageRepository, NewAccount,
+    NewSession, SessionRepository,
 };
 
 #[derive(Clone)]
@@ -85,23 +85,14 @@ impl MailboxService {
 #[derive(Clone)]
 pub struct AccountService {
     account_repository: AccountRepository,
-    api_key_repository: ApiKeyRepository,
     password_service: PasswordService,
-    token_service: TokenService,
 }
 
 impl AccountService {
-    pub fn new(
-        account_repository: AccountRepository,
-        api_key_repository: ApiKeyRepository,
-        password_service: PasswordService,
-        token_service: TokenService,
-    ) -> Self {
+    pub fn new(account_repository: AccountRepository, password_service: PasswordService) -> Self {
         Self {
             account_repository,
-            api_key_repository,
             password_service,
-            token_service,
         }
     }
 
@@ -135,13 +126,7 @@ impl AccountService {
         })
     }
 
-    pub async fn create_account(
-        &self,
-        api_key: Option<&str>,
-        request: CreateAccountRequest,
-    ) -> Result<Account> {
-        self.validate_api_key(api_key).await?;
-
+    pub async fn create_account(&self, request: CreateAccountRequest) -> Result<Account> {
         let (local_part, domain) = parse_email(&request.email)?;
         let password_hash = self.password_service.hash_password(&request.password)?;
         let account = NewAccount {
@@ -157,24 +142,6 @@ impl AccountService {
             .create(account)
             .await
             .map_err(map_account_create_error)
-    }
-
-    async fn validate_api_key(&self, api_key: Option<&str>) -> Result<()> {
-        let api_key = api_key.ok_or(TempMailError::ApiKeyRequired)?;
-        let key_hash = self.token_service.hash_token(api_key);
-        let api_key_id = self
-            .api_key_repository
-            .find_active_by_hash(&key_hash)
-            .await
-            .map_err(|_| TempMailError::InvalidApiKey)?
-            .ok_or(TempMailError::InvalidApiKey)?;
-
-        self.api_key_repository
-            .touch_last_used(api_key_id)
-            .await
-            .map_err(|_| TempMailError::InvalidApiKey)?;
-
-        Ok(())
     }
 }
 

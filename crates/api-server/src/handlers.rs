@@ -22,8 +22,6 @@ use crate::dto::{
 };
 use crate::state::AppState;
 
-const API_KEY_HEADER: &str = "x-api-key";
-
 pub async fn health() -> &'static str {
     "ok"
 }
@@ -42,13 +40,9 @@ pub async fn create_account(
     .await
     .map_err(error_response)?;
 
-    let api_key = headers
-        .get(API_KEY_HEADER)
-        .and_then(|value| value.to_str().ok());
-
     state
         .account_service
-        .create_account(api_key, request)
+        .create_account(request)
         .await
         .map(|account| (StatusCode::CREATED, Json(account.into())))
         .map_err(error_response)

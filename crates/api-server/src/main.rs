@@ -1,7 +1,7 @@
 use anyhow::Result;
 use api_server::config::ApiConfig;
 use api_server::repositories::{
-    AccountRepository, ApiKeyRepository, MailboxRepository, MessageRepository, SessionRepository,
+    AccountRepository, MailboxRepository, MessageRepository, SessionRepository,
 };
 use api_server::routes::router;
 use api_server::services::{
@@ -40,13 +40,7 @@ async fn main() -> Result<()> {
     let event_service = EventService::new(config.redis.url.clone());
 
     let account_repository = AccountRepository::new(db.clone());
-    let api_key_repository = ApiKeyRepository::new(db.clone());
-    let account_service = AccountService::new(
-        account_repository,
-        api_key_repository,
-        password_service.clone(),
-        token_service.clone(),
-    );
+    let account_service = AccountService::new(account_repository, password_service.clone());
 
     let session_repository = SessionRepository::new(db.clone());
     let session_service = SessionService::new(

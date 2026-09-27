@@ -17,8 +17,7 @@ export function useSessionAccounts() {
 
 export function useCreateAccount() {
   return useMutation({
-    mutationFn: ({ apiKey, payload }: { apiKey: string; payload: CreateAccountRequest }) =>
-      createAccount(apiKey, payload),
+    mutationFn: (payload: CreateAccountRequest) => createAccount(payload),
   })
 }
 

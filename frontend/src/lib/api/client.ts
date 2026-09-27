@@ -57,12 +57,9 @@ export function mailboxEventsUrl(mailbox: string) {
   return `${API_BASE_URL}/mailboxes/${encodeURIComponent(mailbox)}/events`
 }
 
-export function createAccount(apiKey: string, payload: CreateAccountRequest) {
+export function createAccount(payload: CreateAccountRequest) {
   return request<Account>('/accounts', {
     method: 'POST',
-    headers: {
-      'X-API-Key': apiKey,
-    },
     body: JSON.stringify(payload),
   })
 }
