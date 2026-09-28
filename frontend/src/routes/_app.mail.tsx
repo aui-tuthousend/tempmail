@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router'
+import { useMemo } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -22,7 +23,7 @@ export function MailView({ view, title }: { view: MessageView; title: string }) 
   const messages = useMessages(true, view)
   const updateMessage = useUpdateMessage()
   const deleteMessage = useDeleteMessage()
-  const visibleMessages = filterMessages(messages.data ?? [], search)
+  const visibleMessages = useMemo(() => filterMessages(messages.data ?? [], search), [messages.data, search])
 
   useInboxEvents(view === 'inbox')
 

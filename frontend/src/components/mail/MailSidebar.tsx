@@ -1,18 +1,33 @@
 import { Link } from '@tanstack/react-router'
+import { useEffect, type ReactNode } from 'react'
 import { Archive, Inbox, Mail, Star, Trash2 } from 'lucide-react'
-import type { ReactNode } from 'react'
+
+import { listMessages } from '../../lib/api/client'
+import type { MessageView } from '../../lib/api/types'
+import { messageQueryKey } from '../../lib/hooks/useMessages'
+import { queryClient } from '../../lib/queryClient'
 
 import { cn } from '../../lib/utils'
 import { Sidebar, SidebarNav, SidebarNavItem } from '../ui/sidebar'
 
 const navItems = [
-  { to: '/mail', label: 'Inbox', icon: <Inbox className="h-4 w-4" /> },
-  { to: '/mail/starred', label: 'Starred', icon: <Star className="h-4 w-4" /> },
-  { to: '/mail/archived', label: 'Archived', icon: <Archive className="h-4 w-4" /> },
-  { to: '/mail/deleted', label: 'Deleted', icon: <Trash2 className="h-4 w-4" /> },
+  { to: '/mail', label: 'Inbox', view: 'inbox', icon: <Inbox className="h-4 w-4" /> },
+  { to: '/mail/starred', label: 'Starred', view: 'starred', icon: <Star className="h-4 w-4" /> },
+  { to: '/mail/archived', label: 'Archived', view: 'archived', icon: <Archive className="h-4 w-4" /> },
+  { to: '/mail/deleted', label: 'Deleted', view: 'deleted', icon: <Trash2 className="h-4 w-4" /> },
 ] as const
 
 export function MailSidebar() {
+  useEffect(() => {
+    for (const item of navItems) {
+      void queryClient.prefetchQuery({
+        queryKey: messageQueryKey(item.view),
+        queryFn: () => listMessages(item.view),
+        staleTime: 30_000,
+      })
+    }
+  }, [])
+
   return (
     <Sidebar className="hidden md:flex">
       <div className="mb-8 flex items-center gap-3 px-2">
@@ -26,16 +41,22 @@ export function MailSidebar() {
       </div>
       <SidebarNav>
         {navItems.map((item) => (
-          <NavItem key={item.to} to={item.to} icon={item.icon} label={item.label} />
+          <NavItem key={item.to} to={item.to} view={item.view} icon={item.icon} label={item.label} />
         ))}
       </SidebarNav>
     </Sidebar>
   )
 }
 
-function NavItem({ to, icon, label }: { to: (typeof navItems)[number]['to']; icon: ReactNode; label: string }) {
+function NavItem({ to, view, icon, label }: { to: (typeof navItems)[number]['to']; view: MessageView; icon: ReactNode; label: string }) {
   return (
-    <Link to={to} activeOptions={{ exact: to === '/mail' }}>
+    <Link
+      to={to}
+      activeOptions={{ exact: to === '/mail' }}
+      onMouseEnter={() => {
+        void queryClient.prefetchQuery({ queryKey: messageQueryKey(view), queryFn: () => listMessages(view), staleTime: 30_000 })
+      }}
+    >
       {({ isActive }) => (
         <SidebarNavItem className={cn('flex items-center gap-3', isActive && 'bg-slate-950 text-white')}>
           {icon}

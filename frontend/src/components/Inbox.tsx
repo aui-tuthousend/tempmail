@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Archive, Paperclip, RotateCcw, Star, Trash2 } from 'lucide-react'
 
 import type { Message, MessageView } from '../lib/api/types'
@@ -95,7 +95,7 @@ export function Inbox({
   )
 }
 
-function MessageItem({
+const MessageItem = memo(function MessageItem({
   message,
   view,
   onOpen,
@@ -115,7 +115,8 @@ function MessageItem({
   onPermanentDelete: () => void
 }) {
   const sender = message.from_name || message.from_address || 'Unknown sender'
-  const snippet = messageSnippet(message)
+  const snippet = useMemo(() => messageSnippet(message), [message.text_body, message.html_body])
+  const receivedAt = useMemo(() => formatDate(message.received_at), [message.received_at])
 
   return (
     <li className={message.is_read ? 'overflow-hidden rounded-2xl border border-slate-200 bg-slate-100' : 'overflow-hidden rounded-2xl border border-indigo-100 bg-white'}>
@@ -137,7 +138,7 @@ function MessageItem({
               <span className="px-1 text-slate-300">-</span>
               <span>{snippet}</span>
             </p>
-            <small className="mt-1 block text-xs text-slate-400">{formatDate(message.received_at)}</small>
+            <small className="mt-1 block text-xs text-slate-400">{receivedAt}</small>
           </div>
         </button>
 
@@ -154,7 +155,7 @@ function MessageItem({
       </div>
     </li>
   )
-}
+})
 
 function MessageActions({
   isArchived,
