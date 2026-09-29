@@ -22,7 +22,7 @@ export function EmailDetailDialog({ message, onClose }: EmailDetailDialogProps) 
   return (
     <Dialog open={Boolean(message)} onOpenChange={(open) => !open && onClose()}>
       {message && (
-        <DialogContent className="flex h-[82vh] max-h-[82vh] max-w-2xl flex-col overflow-hidden p-5">
+        <DialogContent className="flex h-[82vh] max-h-[82vh] w-full max-w-4xl flex-col overflow-hidden p-5 lg:max-w-6xl">
           <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 pb-3">
             <div className="min-w-0">
               <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-widest text-indigo-600">Email detail</p>

@@ -1,12 +1,11 @@
 use anyhow::{Context, Result};
-use base64::Engine;
 use lettre::message::header::{ContentDisposition, ContentTransferEncoding, ContentType};
 use lettre::message::{Mailbox, MessageBuilder, MultiPart, SinglePart};
 use lettre::{AsyncSmtpTransport, AsyncTransport, Tokio1Executor};
 use shared::config::SmtpRelayConfig;
 use tracing::info;
 
-use crate::repository::{EmailSenderRepository, OutboxAttachmentRow, OutboxMessageRecord};
+use crate::repository::{OutboxAttachmentRow, OutboxMessageRecord};
 use crate::storage::ObjectStorage;
 
 enum BodyContent {
@@ -19,10 +18,15 @@ fn parse_addresses(json: &serde_json::Value) -> Result<Vec<Mailbox>> {
     let mut boxes = Vec::new();
 
     for item in arr {
-        let address = item["address"]
-            .as_str()
-            .context("address field is missing")?;
-        let name = item["name"].as_str();
+        let (address, name) = match item.as_str() {
+            Some(address) => (address, None),
+            None => {
+                let address = item["address"]
+                    .as_str()
+                    .context("address field is missing")?;
+                (address, item["name"].as_str())
+            }
+        };
 
         let mbox = match name {
             Some(name) if !name.is_empty() => format!("{name} <{address}>")
@@ -70,14 +74,20 @@ fn build_body_content(text_body: Option<&str>, html_body: Option<&str>) -> BodyC
 
 pub async fn send_outbox_message(
     record: &OutboxMessageRecord,
+    from_address: &str,
     attachments: &[OutboxAttachmentRow],
-    _repository: &EmailSenderRepository,
     object_storage: &ObjectStorage,
     smtp: &SmtpRelayConfig,
 ) -> Result<()> {
     let mailer = build_mailer(smtp)?;
 
-    let from: Mailbox = format!("{} <{}>", smtp.from_name, smtp.username)
+    info!(
+        smtp_from_name = %smtp.from_name,
+        from_address = %from_address,
+        "building email message"
+    );
+
+    let from: Mailbox = format!("{} <{}>", smtp.from_name, from_address)
         .parse()
         .context("failed to parse from mailbox")?;
 
@@ -129,13 +139,11 @@ pub async fn send_outbox_message(
                 .and_then(|ct| ContentType::parse(ct).ok())
                 .unwrap_or(ContentType::parse("application/octet-stream").unwrap());
 
-            let body = base64::prelude::BASE64_STANDARD.encode(&file_bytes);
-
             let attachment_part = SinglePart::builder()
                 .header(content_type)
                 .header(ContentDisposition::attachment(&attachment_row.filename))
                 .header(ContentTransferEncoding::Base64)
-                .body(body);
+                .body(file_bytes);
 
             mixed = mixed.singlepart(attachment_part);
         }
@@ -170,7 +178,7 @@ fn build_mailer(smtp: &SmtpRelayConfig) -> Result<AsyncSmtpTransport<Tokio1Execu
         smtp.password.clone(),
     );
 
-    let transport = AsyncSmtpTransport::<Tokio1Executor>::relay(&smtp.host)?
+    let transport = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&smtp.host)?
         .port(smtp.port)
         .credentials(creds)
         .build();

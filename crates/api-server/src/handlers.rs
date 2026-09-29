@@ -22,6 +22,8 @@ use crate::dto::{
 };
 use crate::state::AppState;
 
+const SEND_EMAIL_RATE_LIMIT_MAX_REQUESTS: usize = 10;
+
 pub async fn health() -> &'static str {
     "ok"
 }
@@ -226,6 +228,15 @@ pub async fn send_message(
     headers: HeaderMap,
     Json(request): Json<SendEmailRequest>,
 ) -> Result<(StatusCode, Json<SendEmailResponse>), (StatusCode, Json<ErrorResponse>)> {
+    rate_limit(
+        &state,
+        "send-email",
+        client_identifier(&headers),
+        SEND_EMAIL_RATE_LIMIT_MAX_REQUESTS,
+    )
+    .await
+    .map_err(error_response)?;
+
     let token = session_token_from_headers(&headers, &state.config.session_cookie_name);
     state
         .outbox_service

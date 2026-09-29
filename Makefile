@@ -1,4 +1,4 @@
-.PHONY: dev redis-up redis-down api smtp processor cleanup frontend check
+.PHONY: dev redis-up redis-down api smtp processor email-sender cleanup frontend check
 
 SHELL := /bin/bash
 
@@ -20,6 +20,9 @@ smtp:
 processor:
 	cargo run -p email-processor
 
+email-sender:
+	cargo run -p email-sender
+
 cleanup:
 	cargo run -p cleanup-worker
 
@@ -31,6 +34,7 @@ dev: redis-up
 	cargo run -p api-server & \
 	cargo run -p smtp-receiver & \
 	cargo run -p email-processor & \
+	cargo run -p email-sender & \
 	cargo run -p cleanup-worker & \
 	cd $(FRONTEND_DIR) && bun run dev & \
 	wait

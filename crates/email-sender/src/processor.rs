@@ -89,12 +89,16 @@ impl EmailSender {
             return Ok(());
         };
 
+        self.repository
+            .update_status(record.id, "sending", None)
+            .await?;
+
         let attachments = self.repository.find_attachments(send_msg.outbox_id).await?;
 
         match send_outbox_message(
             &record,
+            &send_msg.from_address,
             &attachments,
-            &self.repository,
             &self.object_storage,
             &self.config.smtp,
         )
