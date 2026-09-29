@@ -1,4 +1,8 @@
+import { PenLine } from 'lucide-react'
+
 import type { SessionAccount } from '../../lib/api/types'
+import { Button } from '../ui/button'
+import { useCompose } from './compose-context'
 import { SearchInput } from './SearchInput'
 import { UserMenu } from './UserMenu'
 
@@ -11,6 +15,8 @@ type MailHeaderProps = {
 }
 
 export function MailHeader({ accounts, search, onSearchChange }: MailHeaderProps) {
+  const { openCompose } = useCompose()
+
   return (
     <header className="sticky top-0 z-20 grid gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur md:grid-cols-[minmax(0,1fr)_minmax(18rem,42rem)_auto] md:items-center md:px-6">
       <div className="min-w-0">
@@ -18,7 +24,11 @@ export function MailHeader({ accounts, search, onSearchChange }: MailHeaderProps
         <h1 className="truncate text-lg font-bold text-slate-950">{mailboxDomain}</h1>
       </div>
       <SearchInput value={search} onChange={onSearchChange} />
-      <div className="justify-self-end">
+      <div className="flex justify-self-end gap-2">
+        <Button type="button" variant="secondary" onClick={() => openCompose()}>
+          <PenLine className="h-4 w-4" />
+          Compose
+        </Button>
         <UserMenu accounts={accounts} />
       </div>
     </header>

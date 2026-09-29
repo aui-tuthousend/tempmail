@@ -25,7 +25,7 @@ export function MailView({ view, title }: { view: MessageView; title: string }) 
   const deleteMessage = useDeleteMessage()
   const visibleMessages = useMemo(() => filterMessages(messages.data ?? [], search), [messages.data, search])
 
-  useInboxEvents(view === 'inbox')
+  useInboxEvents(true)
 
   return (
     <section className="flex h-full min-h-0 flex-col gap-5 overflow-hidden">

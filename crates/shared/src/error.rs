@@ -19,6 +19,9 @@ pub enum TempMailError {
     #[error("invalid email address: {0}")]
     InvalidEmailAddress(String),
 
+    #[error("bad request: {0}")]
+    BadRequest(String),
+
     #[error("auth configuration error: {message}")]
     AuthConfig { message: String },
 

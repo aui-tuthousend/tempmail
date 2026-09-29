@@ -5,6 +5,7 @@ members = [
     "crates/email-processor",
     "crates/api-server",
     "crates/cleanup-worker",
+    "crates/email-sender",
 ]
 resolver = "2"
 
@@ -20,6 +21,9 @@ base64 = "0.22"
 chrono = { version = "0.4", features = ["serde", "clock"] }
 dotenvy = "0.15"
 hex = "0.4"
+lettre = { version = "0.11", features = ["tokio1-native-tls", "smtp-transport", "builder"] }
+mime = "0.3"
+mime_guess = "2"
 rand = "0.8"
 redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
 serde = { version = "1", features = ["derive"] }

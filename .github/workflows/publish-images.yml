@@ -31,6 +31,8 @@ jobs:
             image: smtp-receiver
           - package: email-processor
             image: email-processor
+          - package: email-sender
+            image: email-sender
           - package: cleanup-worker
             image: cleanup-worker
     steps:

@@ -1,13 +1,14 @@
 use anyhow::Result;
 use api_server::config::ApiConfig;
 use api_server::repositories::{
-    AccountRepository, MailboxRepository, MessageRepository, SessionRepository,
+    AccountRepository, MailboxRepository, MessageRepository, OutboxRepository, SessionRepository,
 };
 use api_server::routes::router;
 use api_server::services::{
-    AccountService, EventService, MailboxService, MessageService, SessionService,
+    AccountService, EventService, MailboxService, MessageService, OutboxService, SessionService,
 };
 use api_server::state::{AppServices, AppState};
+use api_server::storage::ObjectStorage;
 use axum::http::{HeaderValue, Method};
 use shared::auth::{PasswordService, TokenService};
 use sqlx::postgres::PgPoolOptions;
@@ -53,6 +54,16 @@ async fn main() -> Result<()> {
     let message_repository = MessageRepository::new(db.clone());
     let message_service = MessageService::new(message_repository, session_service.clone());
 
+    let object_storage = ObjectStorage::from_config(&config.r2).await;
+    let outbox_repository = OutboxRepository::new(db.clone());
+    let outbox_service = OutboxService::new(
+        outbox_repository,
+        session_service.clone(),
+        object_storage,
+        redis.clone(),
+        config.queue.send_email_stream.clone(),
+    );
+
     let bind_addr = config.bind_addr.clone();
     let cors = cors_layer(&config.allowed_origins)?;
     let services = AppServices {
@@ -61,6 +72,7 @@ async fn main() -> Result<()> {
         account_service,
         session_service,
         message_service,
+        outbox_service,
     };
     let app = router(
         AppState::new(config, db, redis.clone(), redis, services),

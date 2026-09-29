@@ -10,7 +10,7 @@ use axum::Json;
 use futures_util::Stream;
 use futures_util::StreamExt;
 use redis::AsyncCommands;
-use shared::events::{DomainEvent, EMAIL_RECEIVED_CHANNEL};
+use shared::events::{DomainEvent, EMAIL_RECEIVED_CHANNEL, EMAIL_SENT_CHANNEL};
 use shared::TempMailError;
 use tracing::{error, warn};
 
@@ -18,7 +18,7 @@ use crate::dto::{
     AccountAvailabilityQuery, AccountAvailabilityResponse, AccountIdPath, AccountResponse,
     CreateAccountRequest, ErrorResponse, GenerateMailboxResponse, ListMessagesQuery,
     ListMessagesResponse, LoginRequest, LoginResponse, MailboxPath, MessageIdPath, MessageResponse,
-    SessionAccountResponse, UpdateMessageRequest,
+    SendEmailRequest, SendEmailResponse, SessionAccountResponse, UpdateMessageRequest,
 };
 use crate::state::AppState;
 
@@ -221,6 +221,20 @@ pub async fn delete_message(
         .map_err(error_response)
 }
 
+pub async fn send_message(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<SendEmailRequest>,
+) -> Result<(StatusCode, Json<SendEmailResponse>), (StatusCode, Json<ErrorResponse>)> {
+    let token = session_token_from_headers(&headers, &state.config.session_cookie_name);
+    state
+        .outbox_service
+        .send_email(token.as_deref(), request)
+        .await
+        .map(|response| (StatusCode::ACCEPTED, Json(response)))
+        .map_err(error_response)
+}
+
 pub async fn generate_mailbox(State(state): State<AppState>) -> Json<GenerateMailboxResponse> {
     let mailbox = state.mailbox_service.generate_mailbox().await;
 
@@ -263,6 +277,11 @@ pub async fn message_events(
                         yield Ok(Event::default().event("error").data("subscription_failed"));
                         return;
                     }
+                    if let Err(error) = pubsub.subscribe(EMAIL_SENT_CHANNEL).await {
+                        error!(%error, "failed to subscribe to Redis Pub/Sub");
+                        yield Ok(Event::default().event("error").data("subscription_failed"));
+                        return;
+                    }
 
                     let mut messages = pubsub.on_message();
                     while let Some(message) = messages.next().await {
@@ -282,7 +301,6 @@ pub async fn message_events(
                             }
                         };
 
-                        let DomainEvent::EmailReceived(email_received) = event;
                         let current_account_id = match session_service.active_account_id(Some(&token)).await {
                             Ok(account_id) => account_id,
                             Err(error) => {
@@ -292,14 +310,28 @@ pub async fn message_events(
                             }
                         };
 
-                        if email_received.account_id != current_account_id {
-                            continue;
-                        }
+                        match event {
+                            DomainEvent::EmailReceived(email_received) => {
+                                if email_received.account_id != current_account_id {
+                                    continue;
+                                }
 
-                        yield Ok(Event::default()
-                            .event("email.received")
-                            .id(email_received.message_id.to_string())
-                            .data(payload));
+                                yield Ok(Event::default()
+                                    .event("email.received")
+                                    .id(email_received.message_id.to_string())
+                                    .data(payload));
+                            }
+                            DomainEvent::EmailSent(email_sent) => {
+                                if email_sent.account_id != current_account_id {
+                                    continue;
+                                }
+
+                                yield Ok(Event::default()
+                                    .event("email.sent")
+                                    .id(email_sent.outbox_id.to_string())
+                                    .data(payload));
+                            }
+                        }
                     }
                 }
                 Err(error) => {
@@ -356,7 +388,10 @@ pub async fn inbox_events(
                             }
                         };
 
-                        let DomainEvent::EmailReceived(email_received) = event;
+                        let email_received = match event {
+                            DomainEvent::EmailReceived(e) => e,
+                            DomainEvent::EmailSent(_) => continue,
+                        };
                         if email_received.mailbox != mailbox {
                             continue;
                         }
@@ -475,7 +510,9 @@ fn error_response(error: TempMailError) -> (StatusCode, Json<ErrorResponse>) {
         TempMailError::AuthenticationFailed => StatusCode::UNAUTHORIZED,
         TempMailError::InvalidSession | TempMailError::SessionExpired => StatusCode::UNAUTHORIZED,
         TempMailError::AuthorizationFailed => StatusCode::FORBIDDEN,
-        TempMailError::InvalidEmailAddress(_) => StatusCode::BAD_REQUEST,
+        TempMailError::InvalidEmailAddress(_) | TempMailError::BadRequest(_) => {
+            StatusCode::BAD_REQUEST
+        }
         TempMailError::Conflict(_) => StatusCode::CONFLICT,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     };

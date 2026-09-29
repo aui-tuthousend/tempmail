@@ -121,3 +121,51 @@ CREATE TABLE attachments (
 );
 
 CREATE INDEX idx_attachments_message_id ON attachments(message_id);
+
+-- ============================================================
+-- Outbound email
+-- ============================================================
+
+CREATE TABLE outbox_messages (
+    id              UUID PRIMARY KEY,
+    account_id      UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+
+    to_addresses    JSONB NOT NULL,
+    cc_addresses    JSONB,
+    bcc_addresses   JSONB,
+
+    subject         TEXT,
+    text_body       TEXT,
+    html_body       TEXT,
+
+    has_attachments BOOLEAN NOT NULL DEFAULT false,
+    size_bytes      INTEGER NOT NULL DEFAULT 0,
+
+    in_reply_to     VARCHAR(998),
+
+    status          VARCHAR(20) NOT NULL DEFAULT 'pending',
+    error_message   TEXT,
+
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    sent_at         TIMESTAMPTZ
+);
+
+CREATE INDEX idx_outbox_account_status ON outbox_messages(account_id, status);
+CREATE INDEX idx_outbox_pending ON outbox_messages(created_at) WHERE status = 'pending';
+
+CREATE TABLE outbox_attachments (
+    id              UUID PRIMARY KEY,
+    outbox_id       UUID NOT NULL REFERENCES outbox_messages(id) ON DELETE CASCADE,
+
+    filename        VARCHAR(255) NOT NULL,
+    content_type    VARCHAR(127),
+    size_bytes      INTEGER NOT NULL,
+    storage_key     VARCHAR(512) NOT NULL,
+    content_id      VARCHAR(255),
+
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_outbox_attachments_outbox ON outbox_attachments(outbox_id);
+

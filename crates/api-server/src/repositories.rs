@@ -502,6 +502,39 @@ pub struct MessageFlagsUpdate {
     pub is_deleted: Option<bool>,
 }
 
+#[derive(Debug, Clone)]
+pub struct NewOutboxMessage {
+    pub id: Uuid,
+    pub account_id: Uuid,
+    pub to_addresses: serde_json::Value,
+    pub cc_addresses: Option<serde_json::Value>,
+    pub bcc_addresses: Option<serde_json::Value>,
+    pub subject: Option<String>,
+    pub text_body: Option<String>,
+    pub html_body: Option<String>,
+    pub has_attachments: bool,
+    pub size_bytes: i32,
+    pub in_reply_to: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewOutboxAttachment {
+    pub id: Uuid,
+    pub outbox_id: Uuid,
+    pub filename: String,
+    pub content_type: Option<String>,
+    pub size_bytes: i32,
+    pub storage_key: String,
+    pub content_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StoredOutboxMessage {
+    pub id: Uuid,
+    pub account_id: Uuid,
+    pub status: String,
+}
+
 #[derive(Clone)]
 pub struct MessageRepository {
     db: PgPool,
@@ -706,6 +739,140 @@ fn stored_message_from_row(row: &sqlx::postgres::PgRow) -> StoredMessage {
         received_at: row.get("received_at"),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
+    }
+}
+
+#[derive(Clone)]
+pub struct OutboxRepository {
+    db: PgPool,
+}
+
+impl OutboxRepository {
+    pub fn new(db: PgPool) -> Self {
+        Self { db }
+    }
+
+    pub async fn insert(
+        &self,
+        message: NewOutboxMessage,
+        attachments: Vec<NewOutboxAttachment>,
+    ) -> Result<StoredOutboxMessage, sqlx::Error> {
+        let mut tx = self.db.begin().await?;
+
+        let row = sqlx::query(
+            r#"
+            INSERT INTO outbox_messages (
+                id,
+                account_id,
+                to_addresses,
+                cc_addresses,
+                bcc_addresses,
+                subject,
+                text_body,
+                html_body,
+                has_attachments,
+                size_bytes,
+                in_reply_to
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            RETURNING id, account_id, status
+            "#,
+        )
+        .bind(message.id)
+        .bind(message.account_id)
+        .bind(message.to_addresses)
+        .bind(message.cc_addresses)
+        .bind(message.bcc_addresses)
+        .bind(message.subject)
+        .bind(message.text_body)
+        .bind(message.html_body)
+        .bind(message.has_attachments)
+        .bind(message.size_bytes)
+        .bind(message.in_reply_to)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        for attachment in attachments {
+            sqlx::query(
+                r#"
+                INSERT INTO outbox_attachments (
+                    id,
+                    outbox_id,
+                    filename,
+                    content_type,
+                    size_bytes,
+                    storage_key,
+                    content_id
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                "#,
+            )
+            .bind(attachment.id)
+            .bind(attachment.outbox_id)
+            .bind(attachment.filename)
+            .bind(attachment.content_type)
+            .bind(attachment.size_bytes)
+            .bind(attachment.storage_key)
+            .bind(attachment.content_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+
+        Ok(stored_outbox_message_from_row(&row))
+    }
+
+    pub async fn find_by_id(
+        &self,
+        outbox_id: Uuid,
+    ) -> Result<Option<StoredOutboxMessage>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, account_id, status
+            FROM outbox_messages
+            WHERE id = $1
+            "#,
+        )
+        .bind(outbox_id)
+        .fetch_optional(&self.db)
+        .await?;
+
+        Ok(row.as_ref().map(stored_outbox_message_from_row))
+    }
+
+    pub async fn update_status(
+        &self,
+        outbox_id: Uuid,
+        status: &str,
+        error_message: Option<&str>,
+    ) -> Result<Option<StoredOutboxMessage>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            UPDATE outbox_messages
+            SET status = $2,
+                error_message = $3,
+                sent_at = CASE WHEN $2 = 'sent' THEN NOW() ELSE sent_at END,
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING id, account_id, status
+            "#,
+        )
+        .bind(outbox_id)
+        .bind(status)
+        .bind(error_message)
+        .fetch_optional(&self.db)
+        .await?;
+
+        Ok(row.as_ref().map(stored_outbox_message_from_row))
+    }
+}
+
+fn stored_outbox_message_from_row(row: &sqlx::postgres::PgRow) -> StoredOutboxMessage {
+    StoredOutboxMessage {
+        id: row.get("id"),
+        account_id: row.get("account_id"),
+        status: row.get("status"),
     }
 }
 

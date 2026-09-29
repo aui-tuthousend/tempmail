@@ -127,6 +127,31 @@ pub struct UpdateMessageRequest {
     pub is_deleted: Option<bool>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct SendEmailRequest {
+    pub to: Vec<String>,
+    pub cc: Option<Vec<String>>,
+    pub bcc: Option<Vec<String>>,
+    pub subject: Option<String>,
+    pub text_body: Option<String>,
+    pub html_body: Option<String>,
+    pub in_reply_to: Option<String>,
+    pub attachments: Option<Vec<SendEmailAttachmentRequest>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SendEmailAttachmentRequest {
+    pub filename: String,
+    pub content_type: Option<String>,
+    pub data_base64: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SendEmailResponse {
+    pub outbox_id: Uuid,
+    pub status: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct MessageResponse {
     pub id: Uuid,

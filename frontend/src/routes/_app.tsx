@@ -1,5 +1,6 @@
 import { createFileRoute, isRedirect, Outlet, redirect } from '@tanstack/react-router'
 
+import { ComposeProvider } from '../components/mail/compose-context'
 import { MailHeader } from '../components/mail/MailHeader'
 import { MailSidebar } from '../components/mail/MailSidebar'
 import { MailSearchProvider, useMailSearch } from '../components/mail/search-context'
@@ -28,7 +29,9 @@ export const Route = createFileRoute('/_app')({
 function AppShell() {
   return (
     <MailSearchProvider>
-      <ShellContent />
+      <ComposeProvider>
+        <ShellContent />
+      </ComposeProvider>
     </MailSearchProvider>
   )
 }

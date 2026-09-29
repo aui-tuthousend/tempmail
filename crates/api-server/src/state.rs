@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 
 use crate::config::ApiConfig;
 use crate::services::{
-    AccountService, EventService, MailboxService, MessageService, SessionService,
+    AccountService, EventService, MailboxService, MessageService, OutboxService, SessionService,
 };
 
 #[derive(Clone)]
@@ -16,6 +16,7 @@ pub struct AppServices {
     pub account_service: AccountService,
     pub session_service: SessionService,
     pub message_service: MessageService,
+    pub outbox_service: OutboxService,
 }
 
 #[derive(Clone)]
@@ -29,6 +30,7 @@ pub struct AppState {
     pub account_service: AccountService,
     pub session_service: SessionService,
     pub message_service: MessageService,
+    pub outbox_service: OutboxService,
 }
 
 impl AppState {
@@ -49,6 +51,7 @@ impl AppState {
             account_service: services.account_service,
             session_service: services.session_service,
             message_service: services.message_service,
+            outbox_service: services.outbox_service,
         }
     }
 }

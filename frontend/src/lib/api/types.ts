@@ -126,6 +126,28 @@ export type UpdateMessageRequest = {
   is_deleted?: boolean
 }
 
+export type SendEmailAttachmentRequest = {
+  filename: string
+  content_type: string | null
+  data_base64: string
+}
+
+export type SendEmailRequest = {
+  to: string[]
+  cc?: string[] | null
+  bcc?: string[] | null
+  subject?: string | null
+  text_body?: string | null
+  html_body?: string | null
+  in_reply_to?: string | null
+  attachments?: SendEmailAttachmentRequest[] | null
+}
+
+export type SendEmailResponse = {
+  outbox_id: string
+  status: string
+}
+
 export type EmailReceivedEvent = {
   type: 'email_received'
   account_id: string
@@ -134,4 +156,11 @@ export type EmailReceivedEvent = {
   subject: string | null
   from: string | null
   received_at: string
+}
+
+export type EmailSentEvent = {
+  type: 'email_sent'
+  account_id: string
+  outbox_id: string
+  status: string
 }

@@ -8,6 +8,8 @@ import type {
   LoginResponse,
   Message,
   MessageView,
+  SendEmailRequest,
+  SendEmailResponse,
   SessionAccount,
   UpdateMessageRequest,
 } from './types'
@@ -111,6 +113,13 @@ export function getMessage(messageId: string) {
 export function updateMessage(messageId: string, payload: UpdateMessageRequest) {
   return request<Message>(`/messages/${messageId}`, {
     method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function sendMessage(payload: SendEmailRequest) {
+  return request<SendEmailResponse>('/messages/send', {
+    method: 'POST',
     body: JSON.stringify(payload),
   })
 }

@@ -1,19 +1,26 @@
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
 use chrono::{Duration as ChronoDuration, Utc};
+use redis::aio::ConnectionManager;
 use shared::auth::{PasswordService, TokenService};
 use shared::ids::new_uuid_v7;
 use shared::models::{Account, EmailAddress, EmailMessage, Mailbox, Session, StoredMessage};
+use shared::queue::{QueueMessage, SendEmailQueueMessage};
+use shared::redis_helper::push_queue_message;
 use shared::{Result, TempMailError};
 use tracing::{error, warn};
 use uuid::Uuid;
 
 use crate::dto::{
     AccountAvailabilityQuery, AccountAvailabilityResponse, CreateAccountRequest, LoginRequest,
-    LoginResponse, MessageView, SessionAccountResponse, UpdateMessageRequest,
+    LoginResponse, MessageView, SendEmailRequest, SendEmailResponse, SessionAccountResponse,
+    UpdateMessageRequest,
 };
 use crate::repositories::{
     AccountRepository, MailboxRepository, MessageFlagsUpdate, MessageRepository, NewAccount,
-    NewSession, SessionRepository,
+    NewOutboxAttachment, NewOutboxMessage, NewSession, OutboxRepository, SessionRepository,
 };
+use crate::storage::ObjectStorage;
 
 #[derive(Clone)]
 pub struct MailboxService {
@@ -269,6 +276,15 @@ impl SessionService {
         active_account_id(&accounts).ok_or(TempMailError::InvalidSession)
     }
 
+    pub async fn active_account(&self, token: Option<&str>) -> Result<SessionAccountResponse> {
+        let session = self.require_session(token).await?;
+        let accounts = self.session_accounts_by_id(session.id).await?;
+        accounts
+            .into_iter()
+            .find(|account| account.is_active)
+            .ok_or(TempMailError::InvalidSession)
+    }
+
     async fn get_or_create_session(
         &self,
         existing_token: Option<&str>,
@@ -438,6 +454,151 @@ fn map_account_create_error(error: sqlx::Error) -> TempMailError {
     }
 
     TempMailError::AuthorizationFailed
+}
+
+const MAX_ATTACHMENT_BYTES: usize = 10 * 1024 * 1024;
+
+#[derive(Clone)]
+pub struct OutboxService {
+    repository: OutboxRepository,
+    session_service: SessionService,
+    object_storage: ObjectStorage,
+    redis: ConnectionManager,
+    send_email_stream: String,
+}
+
+impl OutboxService {
+    pub fn new(
+        repository: OutboxRepository,
+        session_service: SessionService,
+        object_storage: ObjectStorage,
+        redis: ConnectionManager,
+        send_email_stream: String,
+    ) -> Self {
+        Self {
+            repository,
+            session_service,
+            object_storage,
+            redis,
+            send_email_stream,
+        }
+    }
+
+    pub async fn send_email(
+        &self,
+        token: Option<&str>,
+        request: SendEmailRequest,
+    ) -> Result<SendEmailResponse> {
+        let account = self.session_service.active_account(token).await?;
+        let to_addresses = normalize_addresses(request.to)?;
+        if to_addresses.is_empty() {
+            return Err(TempMailError::BadRequest(
+                "at least one recipient is required".to_owned(),
+            ));
+        }
+
+        let cc_addresses = normalize_addresses(request.cc.unwrap_or_default())?;
+        let bcc_addresses = normalize_addresses(request.bcc.unwrap_or_default())?;
+        let outbox_id = new_uuid_v7();
+        let mut outbox_attachments = Vec::new();
+        let mut attachment_keys = Vec::new();
+        let mut total_size = 0usize;
+
+        for attachment in request.attachments.unwrap_or_default() {
+            let bytes = BASE64_STANDARD
+                .decode(attachment.data_base64.as_bytes())
+                .map_err(|_| {
+                    TempMailError::BadRequest("invalid attachment base64 data".to_owned())
+                })?;
+
+            if bytes.len() > MAX_ATTACHMENT_BYTES {
+                return Err(TempMailError::BadRequest(
+                    "attachment size exceeds 10MB".to_owned(),
+                ));
+            }
+
+            total_size = total_size.saturating_add(bytes.len());
+            let uploaded = self
+                .object_storage
+                .put_outbox_attachment(
+                    outbox_id,
+                    &attachment.filename,
+                    attachment.content_type.as_deref(),
+                    bytes,
+                )
+                .await
+                .map_err(|_| TempMailError::AuthorizationFailed)?;
+
+            attachment_keys.push(uploaded.storage_key.clone());
+            outbox_attachments.push(NewOutboxAttachment {
+                id: uploaded.id,
+                outbox_id,
+                filename: attachment.filename,
+                content_type: attachment.content_type,
+                size_bytes: uploaded.size_bytes as i32,
+                storage_key: uploaded.storage_key,
+                content_id: None,
+            });
+        }
+
+        let outbox = self
+            .repository
+            .insert(
+                NewOutboxMessage {
+                    id: outbox_id,
+                    account_id: account.account_id,
+                    to_addresses: serde_json::json!(&to_addresses),
+                    cc_addresses: (!cc_addresses.is_empty())
+                        .then(|| serde_json::json!(&cc_addresses)),
+                    bcc_addresses: (!bcc_addresses.is_empty())
+                        .then(|| serde_json::json!(&bcc_addresses)),
+                    subject: request.subject.clone(),
+                    text_body: request.text_body.clone(),
+                    html_body: request.html_body.clone(),
+                    has_attachments: !outbox_attachments.is_empty(),
+                    size_bytes: total_size as i32,
+                    in_reply_to: request.in_reply_to.clone(),
+                },
+                outbox_attachments,
+            )
+            .await
+            .map_err(|_| TempMailError::AuthorizationFailed)?;
+
+        let queue_message = QueueMessage::SendEmail(SendEmailQueueMessage {
+            outbox_id: outbox.id,
+            account_id: outbox.account_id,
+            from_address: account.address,
+            to_addresses,
+            cc_addresses,
+            bcc_addresses,
+            subject: request.subject,
+            text_body: request.text_body,
+            html_body: request.html_body,
+            in_reply_to: request.in_reply_to,
+            attachment_keys,
+        });
+
+        let mut redis = self.redis.clone();
+        push_queue_message(&mut redis, &self.send_email_stream, &queue_message)
+            .await
+            .map_err(|_| TempMailError::AuthorizationFailed)?;
+
+        Ok(SendEmailResponse {
+            outbox_id: outbox.id,
+            status: outbox.status,
+        })
+    }
+}
+
+fn normalize_addresses(addresses: Vec<String>) -> Result<Vec<String>> {
+    addresses
+        .into_iter()
+        .map(|address| {
+            let value = address.trim().to_lowercase();
+            let (local_part, domain) = parse_email(&value)?;
+            Ok(format!("{local_part}@{domain}"))
+        })
+        .collect()
 }
 
 #[derive(Clone)]

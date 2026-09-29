@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { useEffect, type ReactNode } from 'react'
-import { Archive, Inbox, Mail, Star, Trash2 } from 'lucide-react'
+import { Archive, Inbox, Mail, PenLine, Star, Trash2 } from 'lucide-react'
 
 import { listMessages } from '../../lib/api/client'
 import type { MessageView } from '../../lib/api/types'
@@ -8,7 +8,9 @@ import { messageQueryKey } from '../../lib/hooks/useMessages'
 import { queryClient } from '../../lib/queryClient'
 
 import { cn } from '../../lib/utils'
+import { Button } from '../ui/button'
 import { Sidebar, SidebarNav, SidebarNavItem } from '../ui/sidebar'
+import { useCompose } from './compose-context'
 
 const navItems = [
   { to: '/mail', label: 'Inbox', view: 'inbox', icon: <Inbox className="h-4 w-4" /> },
@@ -18,6 +20,8 @@ const navItems = [
 ] as const
 
 export function MailSidebar() {
+  const { openCompose } = useCompose()
+
   useEffect(() => {
     for (const item of navItems) {
       void queryClient.prefetchQuery({
@@ -39,6 +43,10 @@ export function MailSidebar() {
           <p className="text-lg font-black tracking-tight">Mail</p>
         </div>
       </div>
+      <Button type="button" className="mb-6 w-full" onClick={() => openCompose()}>
+        <PenLine className="h-4 w-4" />
+        Compose
+      </Button>
       <SidebarNav>
         {navItems.map((item) => (
           <NavItem key={item.to} to={item.to} view={item.view} icon={item.icon} label={item.label} />

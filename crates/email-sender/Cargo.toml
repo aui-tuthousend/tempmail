@@ -1,5 +1,5 @@
 [package]
-name = "api-server"
+name = "email-sender"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -7,21 +7,19 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-async-stream = "0.3"
 aws-config = { version = "1", default-features = false, features = ["behavior-version-latest", "rt-tokio"] }
 aws-credential-types = "1"
 aws-sdk-s3 = "1"
-axum = { version = "0.7", features = ["macros"] }
 base64.workspace = true
 chrono.workspace = true
-futures-util = "0.3"
+lettre.workspace = true
+mime.workspace = true
+mime_guess.workspace = true
 redis.workspace = true
-serde.workspace = true
 serde_json.workspace = true
 shared = { path = "../shared" }
 sqlx.workspace = true
-tokio = { workspace = true, features = ["macros", "net", "signal", "rt-multi-thread", "time"] }
-tower-http = { version = "0.6", features = ["cors", "request-id", "trace"] }
+tokio = { workspace = true, features = ["macros", "signal", "rt-multi-thread", "time"] }
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
 uuid.workspace = true

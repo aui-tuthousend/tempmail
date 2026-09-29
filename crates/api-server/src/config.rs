@@ -1,5 +1,5 @@
 use shared::config::{
-    env_or, env_parse_or, load_dotenv, MailboxConfig, PostgresConfig, RedisConfig,
+    env_or, env_parse_or, load_dotenv, MailboxConfig, PostgresConfig, QueueConfig, RedisConfig,
 };
 use shared::Result;
 
@@ -16,7 +16,19 @@ pub struct ApiConfig {
     pub login_rate_limit_max_requests: usize,
     pub redis: RedisConfig,
     pub postgres: PostgresConfig,
+    pub queue: QueueConfig,
     pub mailbox: MailboxConfig,
+    pub r2: R2Config,
+}
+
+#[derive(Debug, Clone)]
+pub struct R2Config {
+    pub endpoint: String,
+    pub bucket: String,
+    pub access_key_id: String,
+    pub secret_access_key: String,
+    pub region: String,
+    pub prefix: String,
 }
 
 impl ApiConfig {
@@ -35,7 +47,29 @@ impl ApiConfig {
             login_rate_limit_max_requests: env_parse_or("LOGIN_RATE_LIMIT_MAX_REQUESTS", 10)?,
             redis: RedisConfig::from_env()?,
             postgres: PostgresConfig::from_env()?,
+            queue: QueueConfig::from_env()?,
             mailbox: MailboxConfig::from_env()?,
+            r2: R2Config::from_env(),
         })
+    }
+}
+
+impl R2Config {
+    pub fn from_env() -> Self {
+        Self {
+            endpoint: env_or("R2_ENDPOINT", ""),
+            bucket: env_or("R2_BUCKET", ""),
+            access_key_id: env_or("R2_ACCESS_KEY_ID", ""),
+            secret_access_key: env_or("R2_SECRET_ACCESS_KEY", ""),
+            region: env_or("R2_REGION", "auto"),
+            prefix: env_or("R2_PREFIX", "attachments/"),
+        }
+    }
+
+    pub fn is_configured(&self) -> bool {
+        !self.endpoint.is_empty()
+            && !self.bucket.is_empty()
+            && !self.access_key_id.is_empty()
+            && !self.secret_access_key.is_empty()
     }
 }

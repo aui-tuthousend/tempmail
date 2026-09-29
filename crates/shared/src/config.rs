@@ -16,8 +16,18 @@ pub struct PostgresConfig {
 #[derive(Debug, Clone)]
 pub struct QueueConfig {
     pub raw_email_stream: String,
+    pub send_email_stream: String,
     pub consumer_group: String,
     pub stream_block_ms: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct SmtpRelayConfig {
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+    pub password: String,
+    pub from_name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -65,8 +75,21 @@ impl QueueConfig {
     pub fn from_env() -> Result<Self> {
         Ok(Self {
             raw_email_stream: env_or("QUEUE_RAW_EMAIL_STREAM", "email_raw"),
+            send_email_stream: env_or("QUEUE_EMAIL_SEND_STREAM", "email_send"),
             consumer_group: env_or("REDIS_CONSUMER_GROUP", "email-processor"),
             stream_block_ms: env_parse_or("REDIS_STREAM_BLOCK_MS", 5_000)?,
+        })
+    }
+}
+
+impl SmtpRelayConfig {
+    pub fn from_env() -> Result<Self> {
+        Ok(Self {
+            host: env_required("SMTP_RELAY_HOST")?,
+            port: env_parse_or("SMTP_RELAY_PORT", 587)?,
+            username: env_required("SMTP_RELAY_USERNAME")?,
+            password: env_required("SMTP_RELAY_PASSWORD")?,
+            from_name: env_or("SMTP_FROM_NAME", "TempMail"),
         })
     }
 }

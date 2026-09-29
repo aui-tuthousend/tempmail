@@ -1,5 +1,7 @@
 import DOMPurify from 'dompurify'
+import { Reply } from 'lucide-react'
 
+import { useCompose } from './mail/compose-context'
 import type { Message } from '../lib/api/types'
 import { Button } from './ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
@@ -12,6 +14,7 @@ type EmailDetailDialogProps = {
 }
 
 export function EmailDetailDialog({ message, onClose }: EmailDetailDialogProps) {
+  const { openCompose } = useCompose()
   const hasHtmlBody = Boolean(message?.html_body)
   const textBody = message?.text_body || emptyBody
   const htmlBody = message?.html_body ? DOMPurify.sanitize(message.html_body) : ''
@@ -28,11 +31,25 @@ export function EmailDetailDialog({ message, onClose }: EmailDetailDialogProps) 
               </DialogTitle>
               <DialogDescription className="mt-1 truncate text-xs text-slate-500">{formatSender(message)}</DialogDescription>
             </div>
-            <DialogClose asChild>
-              <Button type="button" variant="secondary" size="sm">
-                Tutup
+            <div className="flex shrink-0 gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  openCompose(replyDraft(message))
+                  onClose()
+                }}
+              >
+                <Reply className="h-4 w-4" />
+                Reply
               </Button>
-            </DialogClose>
+              <DialogClose asChild>
+                <Button type="button" variant="secondary" size="sm">
+                  Tutup
+                </Button>
+              </DialogClose>
+            </div>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-2 [scrollbar-width:thin]">
@@ -76,12 +93,28 @@ function MetaItem({ label, value }: { label: string; value: string }) {
   )
 }
 
+function replyDraft(message: Message) {
+  const subject = message.subject?.startsWith('Re:') ? message.subject : `Re: ${message.subject || '(Tanpa subject)'}`
+  const sourceBody = message.text_body || stripHtml(message.html_body || '') || emptyBody
+
+  return {
+    to: message.from_address,
+    subject,
+    in_reply_to: message.message_id,
+    text_body: `\n\n--- Original message ---\nDari: ${formatSender(message)}\nDiterima: ${formatDate(message.received_at)}\n\n${sourceBody}`,
+  }
+}
+
 function formatSender(message: Message) {
   if (!message.from_name) {
     return message.from_address
   }
 
   return `${message.from_name} <${message.from_address}>`
+}
+
+function stripHtml(value: string) {
+  return value.replace(/<[^>]*>/g, ' ')
 }
 
 function formatAddresses(addresses: Message['to_addresses'] | Message['cc_addresses']) {

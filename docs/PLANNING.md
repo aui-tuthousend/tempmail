@@ -747,3 +747,259 @@ If user asks for code change, preserve these decisions:
 - Clean architecture: handlers → services → repositories.
 
 If request conflicts with this doc, ask before coding.
+
+---
+
+## 15. Fitur Send Email (Outbound) — Phase 11
+
+### Goal
+
+User bisa mengirim email dari inbox aktif, dengan support:
+- Text body dan HTML body.
+- Attachment file (upload via frontend → R2 → kirim MIME).
+- Reply ke pesan yang sudah diterima.
+- Status tracking: pending → sending → sent / failed.
+
+### Architecture
+
+```text
+Frontend Compose Dialog
+→ POST /api/messages/send (api-server)
+→ INSERT outbox_messages + Redis Stream "email_send"
+→ email-sender worker consume stream
+→ upload attachment dari R2 ke MIME multipart
+→ kirim via SMTP relay (Mailgun) pakai lettre
+→ UPDATE status outbox_messages
+→ publish event "email.sent" via Redis Pub/Sub
+→ SSE push ke frontend
+```
+
+### New Crate: `email-sender`
+
+```text
+crates/email-sender/
+  src/
+    main.rs        — consumer loop, graceful shutdown
+    config.rs      — SmtpRelayConfig from env
+    sender.rs      — build MIME message, send via lettre
+    repository.rs  — update outbox_messages status
+```
+
+Cargo workspace members tambah `"crates/email-sender"`.
+
+### DB Schema Baru
+
+```sql
+CREATE TABLE outbox_messages (
+    id              UUID PRIMARY KEY,
+    account_id      UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+
+    to_addresses    JSONB NOT NULL,
+    cc_addresses    JSONB,
+    bcc_addresses   JSONB,
+
+    subject         TEXT,
+    text_body       TEXT,
+    html_body       TEXT,
+
+    has_attachments BOOLEAN NOT NULL DEFAULT false,
+    size_bytes      INTEGER NOT NULL DEFAULT 0,
+
+    in_reply_to     VARCHAR(998),
+
+    status          VARCHAR(20) NOT NULL DEFAULT 'pending',
+    error_message   TEXT,
+
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    sent_at         TIMESTAMPTZ
+);
+
+CREATE INDEX idx_outbox_account_status ON outbox_messages(account_id, status);
+CREATE INDEX idx_outbox_pending ON outbox_messages(created_at) WHERE status = 'pending';
+
+CREATE TABLE outbox_attachments (
+    id              UUID PRIMARY KEY,
+    outbox_id       UUID NOT NULL REFERENCES outbox_messages(id) ON DELETE CASCADE,
+
+    filename        VARCHAR(255) NOT NULL,
+    content_type    VARCHAR(127),
+    size_bytes      INTEGER NOT NULL,
+    storage_key     VARCHAR(512) NOT NULL,
+    content_id      VARCHAR(255),
+
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_outbox_attachments_outbox ON outbox_attachments(outbox_id);
+```
+
+### Queue
+
+Redis Stream baru: `email_send` (env var `QUEUE_EMAIL_SEND_STREAM`).
+
+Payload format (JSON di field `payload`):
+
+```json
+{
+  "outbox_id": "uuid",
+  "account_id": "uuid",
+  "from_address": "account.address dari DB (bukan hardcoded)",
+  "to_addresses": ["recipient@example.com"],
+  "cc_addresses": [],
+  "bcc_addresses": [],
+  "subject": "Hello",
+  "text_body": "...",
+  "html_body": "...",
+  "in_reply_to": null,
+  "attachment_keys": ["attachments/uuid/file.pdf"]
+}
+```
+
+Consumer group: `email-sender`, block timeout sama seperti email-processor.
+
+### API Endpoint Baru
+
+```text
+POST /messages/send
+Content-Type: application/json (atau multipart/form-data untuk attachment)
+
+Body (JSON):
+{
+  "to": ["recipient@example.com"],
+  "cc": ["optional@example.com"],
+  "bcc": [],
+  "subject": "Hello World",
+  "text_body": "Plain text version",
+  "html_body": "<p>HTML version</p>",
+  "in_reply_to": "message-id-of-received-email",
+  "attachments": [
+    {
+      "filename": "report.pdf",
+      "content_type": "application/pdf",
+      "data_base64": "JVBERi0xLjQK..."
+    }
+  ]
+}
+
+Response: 202 Accepted
+{
+  "outbox_id": "uuid",
+  "status": "pending"
+}
+```
+
+Alternatif untuk attachment besar: `multipart/form-data` dengan field binary langsung, backend upload ke R2 dulu sebelum enqueue.
+
+### Env Vars Baru
+
+```env
+# Outbound SMTP Relay (Mailgun)
+SMTP_RELAY_HOST=smtp.mailgun.org
+SMTP_RELAY_PORT=587
+SMTP_RELAY_USERNAME=postmaster@intotheheap.net
+SMTP_RELAY_PASSWORD=<mailgun-smtp-password>
+SMTP_FROM_NAME=Intotheheap Mail
+
+# Send Queue
+QUEUE_EMAIL_SEND_STREAM=email_send
+EMAIL_SENDER_CONSUMER_GROUP=email-sender
+EMAIL_SENDER_CONSUMER_NAME=email-sender-1
+EMAIL_SENDER_BATCH_SIZE=5
+```
+
+### Dependencies Baru (workspace Cargo.toml)
+
+```toml
+lettre = { version = "0.11", features = ["tokio1-native-tls", "smtp-transport", "builder"] }
+mime = "0.3"
+mime_guess = "2"
+```
+
+### Implementation Tasks (6 tasks)
+
+#### Task 11.1 — Shared Foundation
+
+- Tambah `SendEmailQueueMessage` di `shared/src/queue.rs`.
+- Tambah konstanta `SEND_EMAIL_PAYLOAD_FIELD`.
+- Tambah `SmtpRelayConfig` di `shared/src/config.rs`.
+- Update `.env` docs.
+
+Done when: `cargo check --workspace` pass.
+
+#### Task 11.2 — API Server: Outbox Repository + Service
+
+- `OutboxRepository`: insert, get by id, update status.
+- `OutboxService::send_email`:
+  - Validasi session active account → ambil `account.address` sebagai `from_address`.
+  - Validasi minimal 1 recipient.
+  - Validasi setiap attachment ≤ 10MB sebelum upload ke R2.
+  - Insert `outbox_messages` + `outbox_attachments`.
+  - XADD ke Redis Stream `email_send`.
+  - Return 202.
+- Handler `POST /messages/send`.
+- Route registration.
+
+Done when: POST `/messages/send` insert row + enqueue tanpa error.
+
+#### Task 11.3 — Crate `email-sender`
+
+- Setup crate skeleton (main, config, sender, repository).
+- Consume Redis Stream `email_send` via consumer group.
+- Untuk setiap message:
+  - Fetch attachment dari R2 via storage key.
+  - Bangun MIME multipart via `lettre` (text + html alternative, attachments).
+  - Kirim via SMTP relay Mailgun.
+  - Update `outbox_messages.status = 'sent'` + `sent_at`.
+  - Kalau gagal: `status = 'failed'` + `error_message`.
+  - Publish `email.sent` event ke Redis Pub/Sub channel.
+  - Ack stream message.
+
+Done when: Email terkirim ke external address via Mailgun.
+
+#### Task 11.4 — Frontend: Compose Dialog
+
+- Tombol "Compose" di sidebar/header.
+- Dialog form: To, CC, BCC, Subject, Body (textarea atau rich editor), Attach file button.
+- Submit → `POST /api/messages/send`.
+- Toast success/error.
+- Reply button di EmailDetailDialog → pre-fill To + Subject + quote original body.
+
+Done when: User bisa compose dan kirim dari UI.
+
+#### Task 11.5 — SSE Event for Sent Status
+
+- Frontend dengarkan event `email.sent` via SSE.
+- Invalidate outbox query kalau perlu.
+- Tampilkan sent feedback realtime.
+
+Done when: Status berubah realtime tanpa refresh.
+
+#### Task 11.6 — Docker & Deploy
+
+- Tambah service `email-sender` di `docker-compose.prod.yml`.
+- Build image via GHCR CI (tambah ke matrix).
+- Env vars SMTP relay masuk Portainer secrets.
+
+Done when: Stack deployable.
+
+### Rate Limiting
+
+- `POST /messages/send` dibatasi per user (misal 10 email/menit) pakai Redis fixed window, sama pola register/login.
+
+### Security Notes
+
+- Active account enforcement: hanya bisa kirim dari email address sendiri.
+- Attachment size limit per file: **maksimal 10MB** (validasi sebelum upload ke R2).
+- Total message size limit termasuk attachments.
+- Sanitize input subject/body sebelum kirim (prevent header injection).
+- Jangan expose SMTP credentials di response/error log.
+
+### Future Enhancement (tidak sekarang)
+
+- Draft/save as draft.
+- Sent folder (query `outbox_messages` per account).
+- Retry mechanism untuk failed sends.
+- Read receipt tracking.
+- DKIM signing (sudah ditangani Mailgun otomatis).
+

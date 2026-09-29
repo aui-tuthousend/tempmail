@@ -8,7 +8,7 @@ use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use crate::handlers::{
     account_availability, activate_session_account, create_account, delete_message,
     generate_mailbox, get_message, health, inbox_events, list_mailbox_messages, list_messages,
-    login, logout, message_events, session_accounts, update_message,
+    login, logout, message_events, send_message, session_accounts, update_message,
 };
 use crate::state::AppState;
 
@@ -27,6 +27,7 @@ pub fn router(state: AppState, cors: CorsLayer) -> Router {
             post(activate_session_account),
         )
         .route("/messages", get(list_messages))
+        .route("/messages/send", post(send_message))
         .route("/messages/events", get(message_events))
         .route(
             "/messages/:message_id",

@@ -75,7 +75,9 @@ impl EmailProcessor {
 
     async fn process_entry(&mut self, entry: &StreamEntry) -> Result<()> {
         let message: QueueMessage = serde_json::from_str(&entry.payload)?;
-        let QueueMessage::RawEmail(raw_message) = message;
+        let QueueMessage::RawEmail(raw_message) = message else {
+            return Err(anyhow!("unexpected send email queue message"));
+        };
 
         let raw_email = raw_message.email;
         let raw_size_bytes = raw_email.data.len();

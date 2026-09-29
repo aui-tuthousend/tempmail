@@ -16,8 +16,12 @@ services:
       - dragonfly
     environment:
       RUST_LOG: info
-      DATABASE_URL: postgresql://neondb_owner:npg_XrhWf5CAnb1T@ep-still-wildflower-b36ozr4l-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://dragonfly:6379
+      QUEUE_RAW_EMAIL_STREAM: email_raw
+      QUEUE_EMAIL_SEND_STREAM: email_send
+      REDIS_CONSUMER_GROUP: email-processor
+      REDIS_STREAM_BLOCK_MS: 5000
       MAILBOX_DOMAIN: intotheheap.net
       MAILBOX_TTL_SECONDS: 3600
       MAILBOX_LOCAL_PART_LENGTH: 12
@@ -29,6 +33,12 @@ services:
       AUTH_RATE_LIMIT_WINDOW_SECONDS: 60
       REGISTER_RATE_LIMIT_MAX_REQUESTS: 5
       LOGIN_RATE_LIMIT_MAX_REQUESTS: 10
+      R2_ENDPOINT: ${R2_ENDPOINT}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_REGION: ${R2_REGION:-auto}
+      R2_PREFIX: ${R2_PREFIX:-attachments/}
     ports:
       - "127.0.0.1:8080:8080"
     networks:
@@ -70,7 +80,7 @@ services:
       - dragonfly
     environment:
       RUST_LOG: info
-      DATABASE_URL: postgresql://neondb_owner:npg_XrhWf5CAnb1T@ep-still-wildflower-b36ozr4l-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://dragonfly:6379
       QUEUE_RAW_EMAIL_STREAM: email_raw
       REDIS_CONSUMER_GROUP: email-processor
@@ -80,12 +90,42 @@ services:
       MESSAGE_TTL_GRACE_SECONDS: 300
       MAILBOX_DOMAIN: intotheheap.net
       MAILBOX_TTL_SECONDS: 3600
-      R2_ENDPOINT: ""
-      R2_BUCKET: ""
-      R2_ACCESS_KEY_ID: ""
-      R2_SECRET_ACCESS_KEY: ""
-      R2_REGION: auto
-      R2_PREFIX: attachments/
+      R2_ENDPOINT: ${R2_ENDPOINT}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_REGION: ${R2_REGION:-auto}
+      R2_PREFIX: ${R2_PREFIX:-attachments/}
+    networks:
+      - tempmail
+
+  email-sender:
+    image: ghcr.io/aui-tuthousend/tempmail-email-sender:latest
+    restart: unless-stopped
+    depends_on:
+      - dragonfly
+    environment:
+      RUST_LOG: info
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://dragonfly:6379
+      QUEUE_RAW_EMAIL_STREAM: email_raw
+      QUEUE_EMAIL_SEND_STREAM: email_send
+      REDIS_CONSUMER_GROUP: email-processor
+      REDIS_STREAM_BLOCK_MS: 5000
+      EMAIL_SENDER_CONSUMER_GROUP: email-sender
+      EMAIL_SENDER_CONSUMER_NAME: email-sender-1
+      EMAIL_SENDER_BATCH_SIZE: 5
+      SMTP_RELAY_HOST: ${SMTP_RELAY_HOST}
+      SMTP_RELAY_PORT: ${SMTP_RELAY_PORT:-587}
+      SMTP_RELAY_USERNAME: ${SMTP_RELAY_USERNAME}
+      SMTP_RELAY_PASSWORD: ${SMTP_RELAY_PASSWORD}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-TempMail}
+      R2_ENDPOINT: ${R2_ENDPOINT}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_REGION: ${R2_REGION:-auto}
+      R2_PREFIX: ${R2_PREFIX:-attachments/}
     networks:
       - tempmail
 
@@ -98,12 +138,12 @@ services:
       CLEANUP_INTERVAL_SECONDS: 60
       CLEANUP_BATCH_SIZE: 100
       SOFT_DELETE_RETENTION_DAYS: 30
-      R2_ENDPOINT: ""
-      R2_BUCKET: ""
-      R2_ACCESS_KEY_ID: ""
-      R2_SECRET_ACCESS_KEY: ""
-      R2_REGION: auto
-      R2_PREFIX: attachments/
+      R2_ENDPOINT: ${R2_ENDPOINT}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_REGION: ${R2_REGION:-auto}
+      R2_PREFIX: ${R2_PREFIX:-attachments/}
     networks:
       - tempmail
 
