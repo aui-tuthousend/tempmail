@@ -41,8 +41,8 @@ fn parse_addresses(json: &serde_json::Value) -> Result<Vec<Mailbox>> {
 }
 
 fn build_body_content(text_body: Option<&str>, html_body: Option<&str>) -> BodyContent {
-    let has_text = text_body.map_or(false, |b| !b.is_empty());
-    let has_html = html_body.map_or(false, |b| !b.is_empty());
+    let has_text = text_body.is_some_and(|b| !b.is_empty());
+    let has_html = html_body.is_some_and(|b| !b.is_empty());
 
     match (has_text, has_html) {
         (true, true) => {
